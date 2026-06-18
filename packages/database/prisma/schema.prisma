@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  name      String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessProfile BusinessProfile?
+  orders          Order[]
+  carts           Cart[]
+  enquiries       Enquiry[]
+  addresses       Address[]
+  reviews         Review[]
+  wishlists       Wishlist[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  CUSTOMER
+  B2B_CUSTOMER
+}
+
+model BusinessProfile {
+  id             String         @id @default(cuid())
+  userId         String         @unique
+  businessName   String
+  gstNumber      String
+  contactPerson  String
+  status         BusinessStatus @default(PENDING)
+  user           User           @relation(fields: [userId], references: [id])
+}
+
+enum BusinessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // HOME, WORK, BILLING, SHIPPING
+  address   String
+  city      String
+  state     String
+  pinCode   String
+  orders    Order[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  products    Product[]
+}
+
+model Product {
+  id                   String           @id @default(cuid())
+  categoryId           String
+  category             Category         @relation(fields: [categoryId], references: [id])
+  name                 String
+  slug                 String           @unique
+  description          String
+  ingredients          String?
+  shelfLife            String?
+  weight               String?
+  nutritionalInfo      String?
+  basePrice            Float
+  offerPrice           Float?
+  b2bPrice             Float?
+  images               ProductImage[]
+  pricingTiers         PricingTier[]
+  cartItems            CartItem[]
+  orderItems           OrderItem[]
+  enquiryItems         EnquiryItem[]
+  reviews              Review[]
+  wishlists            Wishlist[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  url       String
+  isPrimary Boolean @default(false)
+}
+
+model PricingTier {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  minQty    Int
+  maxQty    Int?
+  price     Float
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id])
+  sessionId String?    
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id])
+  sessionId      String?
+  status         OrderStatus @default(PENDING)
+  totalAmount    Float
+  taxAmount      Float
+  shippingAmount Float
+  notes          String?
+  addressId      String?
+  address        Address?    @relation(fields: [addressId], references: [id])
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
+
+model Enquiry {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  notes         String?
+  expectedDate  DateTime?
+  status        EnquiryStatus  @default(PENDING)
+  items         EnquiryItem[]
+  createdAt     DateTime       @default(now())
+}
+
+enum EnquiryStatus {
+  PENDING
+  REVIEWED
+  CONVERTED
+  CANCELLED
+}
+
+model EnquiryItem {
+  id        String  @id @default(cuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+}
