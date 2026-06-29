@@ -717,7 +717,7 @@ app.get("/api/users/me", async (req: Request, res: Response) => {
 
 // Trigger nodemon restart after types installation
 const PORT = process.env.PORT || 8080;
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.VERCEL) {
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`API running on port ${PORT}`);
   });
