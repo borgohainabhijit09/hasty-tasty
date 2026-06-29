@@ -101,7 +101,7 @@ export default function Home() {
             </motion.div>
 
             {/* Feature small points */}
-            <motion.div variants={fadeInUp} className="flex gap-6 pt-2">
+            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4 sm:gap-6 pt-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#FAF8F5] border border-[#EAE2DB] flex items-center justify-center text-[#C89F5F] shadow-sm">
                   <ShieldCheck size={18} />
@@ -337,10 +337,19 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+              
+              <div className="mt-6 md:hidden">
+                <Link
+                  href="/b2b"
+                  className="inline-flex items-center gap-2 bg-[#4A171E] hover:bg-[#330F13] text-white text-xs font-medium px-5 py-3 rounded-lg transition-colors shadow-md w-full justify-center"
+                >
+                  Request Quote <ArrowRight size={14} />
+                </Link>
+              </div>
             </div>
 
             {/* Request Quote button — bottom right */}
-            <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-10">
+            <div className="absolute bottom-8 right-8 z-10 hidden md:block">
               <Link
                 href="/b2b"
                 className="inline-flex items-center gap-2 bg-[#4A171E] hover:bg-[#330F13] text-white text-xs md:text-sm font-medium px-4 py-2.5 md:px-6 md:py-3 rounded-lg transition-colors shadow-lg"

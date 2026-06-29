@@ -153,14 +153,14 @@ export default function Header() {
 
       {/* Main Navigation */}
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-[1260px] mx-auto px-8 py-4 flex items-center justify-between">
+        <div className="max-w-[1260px] mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/" className="relative w-52 h-20 md:w-64 md:h-[90px] block">
+            <Link href="/" className="relative w-28 h-10 sm:w-36 sm:h-14 md:w-44 md:h-16 block">
               <Image
                 src="/images/logo.png"
                 alt="Hasty Tasty Logo"
                 fill
-                sizes="(max-width: 768px) 208px, 256px"
+                sizes="(max-width: 640px) 112px, (max-width: 768px) 144px, 176px"
                 className="object-contain object-left"
                 priority
               />
@@ -233,7 +233,7 @@ export default function Header() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4 lg:gap-5">
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
             
             {/* Search Bar Component */}
             <div className="relative flex items-center" ref={searchRef}>

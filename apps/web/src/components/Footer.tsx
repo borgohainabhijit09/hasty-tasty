@@ -6,15 +6,15 @@ export default function Footer() {
     <footer className="bg-white text-[#3A1E14]">
       {/* Main Footer Body */}
       <div className="max-w-[1260px] mx-auto px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
           {/* Col 1 — Brand */}
-          <div className="space-y-4 lg:col-span-1">
-            <div className="relative w-36 h-14">
+          <div className="space-y-4 col-span-2 md:col-span-1">
+            <div className="relative w-24 h-10">
               <Image
                 src="/images/logo.png"
                 alt="Hasty Tasty Logo"
                 fill
-                sizes="144px"
+                sizes="96px"
                 className="object-contain object-left"
               />
             </div>

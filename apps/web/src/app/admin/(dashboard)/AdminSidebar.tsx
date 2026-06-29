@@ -46,8 +46,8 @@ export default function AdminSidebar({ initials, userName }: { initials: string;
     <aside className="w-64 bg-[#21050A] text-white flex flex-col h-full flex-shrink-0 relative z-20">
       {/* Logo Area */}
       <div className="p-6 flex flex-col items-center justify-center border-b border-white/10 mb-4">
-        <div className="relative w-32 h-16 mb-2">
-           <Image src="/images/logo.png" alt="Hasty Tasty Logo" fill sizes="128px" className="object-contain" priority />
+        <div className="relative w-24 h-12 mb-2">
+           <Image src="/images/logo.png" alt="Hasty Tasty Logo" fill sizes="96px" className="object-contain" priority />
         </div>
         <p className="text-[#C89F5F] text-[10px] uppercase tracking-widest font-semibold mt-1">Taster's Pride</p>
       </div>
