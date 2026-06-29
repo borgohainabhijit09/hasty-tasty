@@ -191,10 +191,10 @@ export default function B2BPage() {
                 <p className="text-white/80 text-[13px] leading-relaxed mb-2">
                   Register your business to access our exclusive wholesale pricing.
                 </p>
-                <button className="w-full bg-[#E8BA6E] hover:bg-[#D5A75B] text-[#3A1E14] font-semibold text-sm py-3.5 px-6 rounded-lg flex items-center justify-between transition-colors">
+                <Link href="/signup?b2b=true" className="w-full bg-[#E8BA6E] hover:bg-[#D5A75B] text-[#3A1E14] font-semibold text-sm py-3.5 px-6 rounded-lg flex items-center justify-between transition-colors">
                   <span>Register Now</span>
                   <ArrowRight size={16} />
-                </button>
+                </Link>
               </div>
             </div>
           </div>

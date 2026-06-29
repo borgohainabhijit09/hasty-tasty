@@ -57,7 +57,7 @@ export default function Header() {
 
     // Fetch categories dynamically
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-    fetch(`${apiUrl}/api/categories`)
+    fetch(`${apiUrl}/api/categories?b2c=true`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -79,24 +79,18 @@ export default function Header() {
       }
       
       setIsSearching(true);
-      const supabase = createClient();
-      
-      // Fetch matching products
-      const { data } = await supabase
-        .from('Product')
-        .select(`
-          id, 
-          name, 
-          slug, 
-          basePrice,
-          images:ProductImage(url)
-        `)
-        .ilike('name', `%${searchQuery}%`)
-        .eq('isActive', true)
-        .limit(5);
-        
-      setSearchResults(data || []);
-      setIsSearching(false);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+        const res = await fetch(`${apiUrl}/api/products?search=${encodeURIComponent(searchQuery)}&b2c=true`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching search results:", err);
+      } finally {
+        setIsSearching(false);
+      }
     };
 
     const debounce = setTimeout(() => {
@@ -138,15 +132,20 @@ export default function Header() {
             </div>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/track" className="flex items-center gap-2 hover:text-white transition-colors">
+            <Link href="/account/orders" className="flex items-center gap-2 hover:text-white transition-colors">
               <Truck size={14} className="text-[#C89F5F]" /> <span>Track Order</span>
             </Link>
-            <Link href="/help" className="flex items-center gap-2 hover:text-white transition-colors">
+            <Link href="/contact" className="flex items-center gap-2 hover:text-white transition-colors">
               <HelpCircle size={14} className="text-[#C89F5F]" /> <span>Help Center</span>
             </Link>
-            <Link href="/stores" className="flex items-center gap-2 hover:text-white transition-colors">
+            <a 
+              href="https://maps.app.goo.gl/71xybeyPSXtLXZ4N8" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center gap-2 hover:text-white transition-colors"
+            >
               <MapPin size={14} className="text-[#C89F5F]" /> <span>Store Locator</span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -258,10 +257,20 @@ export default function Header() {
               </AnimatePresence>
               
               <button 
-                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                    setIsMobileMenuOpen(true);
+                    setTimeout(() => {
+                      const mobileSearchInput = document.getElementById('mobile-search-input');
+                      if (mobileSearchInput) mobileSearchInput.focus();
+                    }, 200);
+                  } else {
+                    setIsSearchOpen(!isSearchOpen);
+                  }
+                }}
                 className="text-gray-600 hover:text-[#3A1E14] transition-colors p-1"
               >
-                {isSearchOpen && window.innerWidth >= 768 ? <X size={20} /> : <Search size={20} />}
+                {isSearchOpen ? <X size={20} /> : <Search size={20} />}
               </button>
 
               {/* Search Dropdown */}
@@ -387,6 +396,7 @@ export default function Header() {
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input 
+                    id="mobile-search-input"
                     type="text"
                     placeholder="Search products..."
                     value={searchQuery}

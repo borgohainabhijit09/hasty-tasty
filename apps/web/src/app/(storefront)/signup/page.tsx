@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signup } from "../login/actions";
 
 const fadeInUp = {
@@ -17,6 +17,15 @@ export default function SignupPage() {
 
   const [isB2B, setIsB2B] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("b2b") === "true") {
+        setIsB2B(true);
+      }
+    }
+  }, []);
 
   async function handleSubmit(formData: FormData) {
     setIsPending(true);

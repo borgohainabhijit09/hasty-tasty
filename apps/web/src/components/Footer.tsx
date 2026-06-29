@@ -45,7 +45,7 @@ export default function Footer() {
           <div className="space-y-4">
             <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">Shop</h4>
             <ul className="space-y-2.5">
-              {["Cakes", "Cookies", "Pastries", "Snacks", "Breads", "Gift Hampers"].map((item) => (
+              {["Cakes", "Cookies", "Pastries", "Breads", "Gift Hampers"].map((item) => (
                 <li key={item}>
                   <Link href={`/shop?category=${item.toLowerCase().replace(" ", "-")}`} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">
                     {item}
@@ -55,54 +55,45 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Col 3 — Company */}
+          {/* Col 3 — B2B Wholesale */}
+          <div className="space-y-4">
+            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">B2B Wholesale</h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: "B2B Portal",   href: "/b2b" },
+                { label: "Register Partner", href: "/signup?b2b=true" },
+              ].map((l) => (
+                <li key={l.label}>
+                  <Link href={l.href} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">{l.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Col 4 — My Account */}
+          <div className="space-y-4">
+            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">My Account</h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: "Dashboard",   href: "/account" },
+                { label: "My Orders",    href: "/account/orders" },
+                { label: "My Addresses", href: "/account/addresses" },
+                { label: "Account Details", href: "/account/details" },
+              ].map((l) => (
+                <li key={l.label}>
+                  <Link href={l.href} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">{l.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Col 5 — Company */}
           <div className="space-y-4">
             <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">Company</h4>
             <ul className="space-y-2.5">
               {[
                 { label: "About Us",   href: "/about" },
-                { label: "Our Story",  href: "/story" },
-                { label: "Careers",    href: "/careers" },
-                { label: "Blog",       href: "/blog" },
                 { label: "Contact Us", href: "/contact" },
-                { label: "FAQs",       href: "/faqs" },
-              ].map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Col 4 — Support */}
-          <div className="space-y-4">
-            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">Support</h4>
-            <ul className="space-y-2.5">
-              {[
-                { label: "Shipping Policy",    href: "/shipping" },
-                { label: "Returns & Refunds",  href: "/returns" },
-                { label: "Track Order",        href: "/track" },
-                { label: "Help Center",        href: "/help" },
-                { label: "Terms & Conditions", href: "/terms" },
-                { label: "Privacy Policy",     href: "/privacy" },
-              ].map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Col 5 — Wholesale & Bulk */}
-          <div className="space-y-4">
-            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">Wholesale &amp; Bulk Orders</h4>
-            <ul className="space-y-2.5">
-              {[
-                { label: "Wholesale",         href: "/b2b/wholesale" },
-                { label: "Corporate Orders",  href: "/b2b/corporate" },
-                { label: "Bulk Enquiries",    href: "/b2b/bulk" },
-                { label: "Event Orders",      href: "/b2b/events" },
-                { label: "Become a Partner",  href: "/b2b/partner" },
               ].map((l) => (
                 <li key={l.label}>
                   <Link href={l.href} className="text-gray-500 text-xs hover:text-[#C89F5F] transition-colors">{l.label}</Link>

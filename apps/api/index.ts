@@ -189,7 +189,7 @@ app.get("/api/products", async (req: Request, res: Response) => {
     console.log("REQUEST RECEIVED: GET /api/products");
     console.log("QUERY PARAMS", req.query);
 
-    const { category, b2b, b2c } = req.query;
+    const { category, b2b, b2c, search } = req.query;
 
     let query = `
       SELECT 
@@ -235,6 +235,11 @@ app.get("/api/products", async (req: Request, res: Response) => {
     if (category) {
       conditions.push(`p.id IN (SELECT "productId" FROM "ProductCategory" pc JOIN "Category" c ON pc."categoryId" = c.id WHERE c.slug = $${conditions.length + 1})`);
       params.push(String(category));
+    }
+
+    if (search) {
+      conditions.push(`p.name ILIKE $${conditions.length + 1}`);
+      params.push(`%${search}%`);
     }
 
     if (b2b === "true") {

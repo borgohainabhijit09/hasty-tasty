@@ -34,14 +34,20 @@ export default function Home() {
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories?b2c=true`)
       .then(res => res.json())
-      .then(data => setCategories(data.filter((c: any) => c.isActive !== false)))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCategories(data.filter((c: any) => c.isActive !== false));
+        }
+      })
       .catch(console.error);
 
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`)
       .then(res => res.json())
       .then(data => {
-        // Just take the first 5 active products for now
-        setBestSellers(data.filter((p: any) => p.isActive).slice(0, 5));
+        if (Array.isArray(data)) {
+          // Just take the first 5 active products for now
+          setBestSellers(data.filter((p: any) => p.isActive).slice(0, 5));
+        }
       })
       .catch(console.error);
   }, []);
