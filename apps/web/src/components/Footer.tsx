@@ -14,6 +14,7 @@ export default function Footer() {
                 src="/images/logo.png"
                 alt="Hasty Tasty Logo"
                 fill
+                sizes="144px"
                 className="object-contain object-left"
               />
             </div>
@@ -92,9 +93,9 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Col 5 — B2B & Bulk */}
+          {/* Col 5 — Wholesale & Bulk */}
           <div className="space-y-4">
-            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">B2B &amp; Bulk Orders</h4>
+            <h4 className="text-[#C89F5F] text-[10px] font-bold uppercase tracking-[0.2em]">Wholesale &amp; Bulk Orders</h4>
             <ul className="space-y-2.5">
               {[
                 { label: "Wholesale",         href: "/b2b/wholesale" },
@@ -119,7 +120,7 @@ export default function Footer() {
       <div className="max-w-[1260px] mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
         <p className="text-[11px] text-gray-500">&copy; 2026 Hasty Tasty. All Rights Reserved.</p>
         <p className="text-[11px] text-gray-500">
-          Made with <span className="text-red-500">♥</span> for You
+          Beautifully designed by <a href="https://sygmiainnovative.co.in/" target="_blank" rel="noopener noreferrer" className="hover:text-[#C89F5F] transition-colors underline underline-offset-2">Sygmia Innovative</a>
         </p>
       </div>
     </footer>

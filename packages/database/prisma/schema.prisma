@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -19,7 +20,6 @@ model User {
 
   businessProfile BusinessProfile?
   orders          Order[]
-  carts           Cart[]
   enquiries       Enquiry[]
   addresses       Address[]
   reviews         Review[]
@@ -29,6 +29,7 @@ model User {
 enum Role {
   SUPER_ADMIN
   CUSTOMER
+  PENDING_B2B
   B2B_CUSTOMER
 }
 
@@ -38,6 +39,7 @@ model BusinessProfile {
   businessName   String
   gstNumber      String
   contactPerson  String
+  tradeLicense   String?
   status         BusinessStatus @default(PENDING)
   user           User           @relation(fields: [userId], references: [id])
 }
@@ -65,15 +67,28 @@ model Category {
   name        String
   slug        String    @unique
   description String?
-  products    Product[]
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  isB2C       Boolean   @default(true)
+  isB2B       Boolean   @default(false)
+  productCategories ProductCategory[]
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
 }
 
 model Product {
   id                   String           @id @default(cuid())
-  categoryId           String
-  category             Category         @relation(fields: [categoryId], references: [id])
+  productCategories    ProductCategory[]
   name                 String
   slug                 String           @unique
+  sku                  String?          @unique
   description          String
   ingredients          String?
   shelfLife            String?
@@ -82,9 +97,10 @@ model Product {
   basePrice            Float
   offerPrice           Float?
   b2bPrice             Float?
+  stock                Int              @default(0)
+  isActive             Boolean          @default(true)
   images               ProductImage[]
   pricingTiers         PricingTier[]
-  cartItems            CartItem[]
   orderItems           OrderItem[]
   enquiryItems         EnquiryItem[]
   reviews              Review[]
@@ -110,28 +126,10 @@ model PricingTier {
   price     Float
 }
 
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String?
-  user      User?      @relation(fields: [userId], references: [id])
-  sessionId String?    
-  items     CartItem[]
-}
-
-model CartItem {
-  id        String  @id @default(cuid())
-  cartId    String
-  cart      Cart    @relation(fields: [cartId], references: [id])
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
-}
-
 model Order {
   id             String      @id @default(cuid())
-  userId         String?
-  user           User?       @relation(fields: [userId], references: [id])
-  sessionId      String?
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
   status         OrderStatus @default(PENDING)
   totalAmount    Float
   taxAmount      Float
@@ -145,8 +143,10 @@ model Order {
 
 enum OrderStatus {
   PENDING
+  ACCEPTED
   CONFIRMED
   PREPARING
+  PROCESSING
   READY
   OUT_FOR_DELIVERY
   DELIVERED
@@ -177,7 +177,11 @@ model Enquiry {
 enum EnquiryStatus {
   PENDING
   REVIEWED
+  ACCEPTED
+  PROCESSING
   CONVERTED
+  OUT_FOR_DELIVERY
+  DELIVERED
   CANCELLED
 }
 
@@ -208,4 +212,13 @@ model Wishlist {
   productId String
   product   Product  @relation(fields: [productId], references: [id])
   createdAt DateTime @default(now())
+}
+
+
+model ShippingRate {
+  id        String   @id @default(cuid())
+  state     String   @unique
+  rate      Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

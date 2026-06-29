@@ -6,6 +6,7 @@ import {
   Phone, Mail, MessageCircle, MapPin, 
   Cake, Gift, Truck, MessageSquare, ShieldCheck, ArrowRight, Store, Leaf, Shield
 } from "lucide-react";
+import Link from "next/link";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -278,9 +279,9 @@ export default function ContactPage() {
                     <div className="flex-1 h-px bg-[#C89F5F]"></div>
                   </div>
                   <p className="text-[#EBE3D5] text-[14px]">Experience our magic in person at our bakery.</p>
-                  <button className="bg-[#C89F5F] hover:bg-[#B38C4F] text-[#3A1E14] font-semibold text-[13px] px-6 py-2.5 rounded-lg flex items-center gap-2 transition-colors inline-flex">
+                  <Link href="https://maps.app.goo.gl/qe7pKTnZEgbojpJH6" target="_blank" rel="noopener noreferrer" className="bg-[#C89F5F] hover:bg-[#B38C4F] text-[#3A1E14] font-semibold text-[13px] px-6 py-2.5 rounded-lg flex items-center gap-2 transition-colors inline-flex">
                     Store Locator <ArrowRight size={14} />
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -303,9 +304,9 @@ export default function ContactPage() {
                   <div className="flex-1 h-px bg-[#C89F5F]"></div>
                 </div>
                 <h3 className="text-3xl font-heading font-bold text-[#3A1E14] leading-tight">Explore our delicious collection online.</h3>
-                <button className="bg-transparent border border-[#3A1E14] hover:bg-[#3A1E14] hover:text-white text-[#3A1E14] font-semibold text-[13px] px-6 py-2.5 rounded-lg flex items-center gap-2 transition-colors inline-flex">
+                <Link href="/shop" className="bg-transparent border border-[#3A1E14] hover:bg-[#3A1E14] hover:text-white text-[#3A1E14] font-semibold text-[13px] px-6 py-2.5 rounded-lg flex items-center gap-2 transition-colors inline-flex">
                   Shop Now <ArrowRight size={14} />
-                </button>
+                </Link>
               </div>
             </div>
 

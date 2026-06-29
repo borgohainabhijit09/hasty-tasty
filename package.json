@@ -8,10 +8,14 @@
     "build": "turbo run build"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "turbo": "^2.1.2"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "pg": "^8.21.0"
+  }
 }

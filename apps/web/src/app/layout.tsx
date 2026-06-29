@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -18,6 +16,9 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Hasty Tasty | Premium Luxury Bakery",
   description: "Experience the finest bakery delights crafted with passion and premium ingredients.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -31,9 +32,7 @@ export default function RootLayout({
       className={`${inter.variable} ${playfair.variable} h-full antialiased bg-background text-foreground`}
     >
       <body className="min-h-full flex flex-col">
-        <Header />
         {children}
-        <Footer />
       </body>
     </html>
   );

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Search, ShoppingCart, MapPin, HelpCircle, Package, Truck, ShieldCheck, Heart, Tag, Lock, RefreshCw, Headphones, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useCartStore } from "@/store/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -25,6 +26,25 @@ const staggerContainer = {
 
 export default function Home() {
   const reviewContainerRef = useRef<HTMLDivElement>(null);
+  const categoryContainerRef = useRef<HTMLDivElement>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [bestSellers, setBestSellers] = useState<any[]>([]);
+  const { addItem } = useCartStore();
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories?b2c=true`)
+      .then(res => res.json())
+      .then(data => setCategories(data.filter((c: any) => c.isActive !== false)))
+      .catch(console.error);
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`)
+      .then(res => res.json())
+      .then(data => {
+        // Just take the first 5 active products for now
+        setBestSellers(data.filter((p: any) => p.isActive).slice(0, 5));
+      })
+      .catch(console.error);
+  }, []);
 
   return (
     <main className="flex-grow flex flex-col overflow-x-hidden font-sans">
@@ -123,36 +143,42 @@ export default function Home() {
             <p className="text-gray-400 text-xs">Discover our wide range of freshly baked delights</p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[
-              { name: "Cakes", image: "/images/hero-cake.png" },
-              { name: "Cookies", image: "/images/pastries-new.png" },
-              { name: "Pastries", image: "/images/pastries-new.png" },
-              { name: "Breads", image: "/images/pastries-new.png" },
-              { name: "Snacks", image: "/images/pastries-new.png" },
-              { name: "Gift Hampers", image: "/images/hampers.png" }
-            ].map((cat, idx) => (
+          <div className="relative">
+            {/* Left arrow */}
+            <button 
+              onClick={() => {
+                if (categoryContainerRef.current) categoryContainerRef.current.scrollBy({ left: -320, behavior: 'smooth' })
+              }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -ml-4 lg:-ml-12 z-10 w-10 h-10 rounded-full border border-[#C89F5F] bg-white text-[#C89F5F] items-center justify-center hover:bg-[#C89F5F] hover:text-white transition-colors shadow-sm hidden md:flex"
+            >
+              <ArrowRight size={15} className="rotate-180" />
+            </button>
+
+            <div 
+              ref={categoryContainerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            >
+            {categories.map((cat, idx) => (
               <motion.div
-                key={cat.name}
+                key={cat.id || cat.slug}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, margin: "-50px" }}
                 variants={fadeInUp}
                 transition={{ delay: idx * 0.08 }}
+                className="flex-shrink-0 w-[180px] md:w-[220px] snap-start"
               >
-                <Link href={`/shop?category=${cat.name.toLowerCase().replace(' ', '-')}`}>
-                  <div className="bg-white rounded-2xl overflow-hidden group cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300">
-                    {/* Image area — full-bleed, square */}
+                <Link href={`/shop?category=${cat.slug}`}>
+                  <div className="bg-white rounded-2xl overflow-hidden group cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100">
                     <div className="w-full aspect-square relative overflow-hidden bg-[#F7F4F0]">
                       <Image
-                        src={cat.image}
+                        src={cat.imageUrl || "/images/hero-cake.png"}
                         alt={cat.name}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>
-                    {/* Label row */}
-                    <div className="px-3 py-3 flex items-center justify-between">
+                    <div className="px-3 py-3 flex items-center justify-between bg-white relative z-10">
                       <h3 className="text-[13px] font-semibold text-[#3A1E14]">{cat.name}</h3>
                       <div className="w-6 h-6 rounded-full bg-[#C89F5F] flex items-center justify-center text-white flex-shrink-0 group-hover:bg-[#4A171E] transition-colors duration-300">
                         <ArrowRight size={11} />
@@ -162,6 +188,17 @@ export default function Home() {
                 </Link>
               </motion.div>
             ))}
+            </div>
+
+            {/* Right arrow */}
+            <button 
+              onClick={() => {
+                if (categoryContainerRef.current) categoryContainerRef.current.scrollBy({ left: 320, behavior: 'smooth' })
+              }}
+              className="absolute right-0 top-1/2 -translate-y-1/2 -mr-4 lg:-mr-12 z-10 w-10 h-10 rounded-full border border-[#C89F5F] bg-white text-[#C89F5F] items-center justify-center hover:bg-[#C89F5F] hover:text-white transition-colors shadow-sm hidden md:flex"
+            >
+              <ArrowRight size={15} />
+            </button>
           </div>
         </div>
       </section>
@@ -185,43 +222,47 @@ export default function Home() {
 
           {/* Product cards row */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[
-              { name: "Chocolate Truffle Cake", price: "₹1,199", rating: 4.5, image: "/images/hero-cake.png" },
-              { name: "Butterscotch Cake", price: "₹999", rating: 5, image: "/images/hero-cake.png" },
-              { name: "Black Forest Cake", price: "₹1,099", rating: 4.5, image: "/images/hero-cake.png" },
-              { name: "Premium Cookies Box", price: "₹499", rating: 5, image: "/images/pastries-new.png" },
-              { name: "Red Velvet Cake", price: "₹1,199", rating: 4, image: "/images/hero-cake.png" },
-            ].map((product, idx) => (
+            {bestSellers.map((product, idx) => (
               <motion.div
-                key={product.name}
+                key={product.id || product.name}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, margin: "-50px" }}
                 variants={fadeInUp}
                 transition={{ delay: idx * 0.08 }}
-                className="bg-[#FAF8F5] border border-gray-100 rounded-2xl overflow-hidden group hover:shadow-lg transition-all duration-300"
+                className="bg-[#FAF8F5] border border-gray-100 rounded-2xl overflow-hidden group hover:shadow-lg transition-all duration-300 flex flex-col"
               >
-                {/* Image */}
-                <div className="w-full aspect-square relative bg-white overflow-hidden">
+                <Link href={`/product/${product.slug}`} className="block relative w-full aspect-square bg-white overflow-hidden">
                   <Image
-                    src={product.image}
+                    src={product.images?.[0]?.url || "/images/hero-cake.png"}
                     alt={product.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                </div>
-                {/* Info */}
-                <div className="p-3 space-y-2">
-                  <h3 className="text-[12px] font-semibold text-[#3A1E14] leading-tight">{product.name}</h3>
-                  {/* Stars */}
-                  <div className="flex gap-0.5">
+                </Link>
+                <div className="p-3 flex flex-col flex-1 space-y-2">
+                  <Link href={`/product/${product.slug}`} className="block">
+                    <h3 className="text-[12px] font-semibold text-[#3A1E14] leading-tight hover:underline line-clamp-2">{product.name}</h3>
+                  </Link>
+                  <div className="flex gap-0.5 mt-auto">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <span key={s} className={`text-[11px] ${s <= Math.floor(product.rating) ? "text-[#C89F5F]" : s - 0.5 <= product.rating ? "text-[#C89F5F]" : "text-gray-300"}`}>★</span>
+                      <span key={s} className="text-[11px] text-[#C89F5F]">★</span>
                     ))}
                   </div>
-                  <p className="text-[13px] font-bold text-[#3A1E14]">{product.price}</p>
-                  {/* Add to Cart */}
-                  <button className="w-full bg-[#4A171E] hover:bg-[#330F13] text-white text-[11px] font-medium py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                  <p className="text-[13px] font-bold text-[#3A1E14]">₹{product.basePrice || product.price}</p>
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      addItem({
+                        id: product.id,
+                        name: product.name,
+                        price: product.basePrice || product.price,
+                        quantity: 1,
+                        image: product.images?.[0]?.url || "/images/hero-cake.png"
+                      });
+                    }}
+                    className="w-full bg-[#4A171E] hover:bg-[#330F13] text-white text-[11px] font-medium py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors mt-2"
+                  >
                     <ShoppingCart size={12} />
                     Add to Cart <ArrowRight size={11} />
                   </button>
@@ -484,53 +525,6 @@ export default function Home() {
             >
               <ArrowRight size={15} />
             </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Instagram Feed ── */}
-      <section className="pb-14 bg-white">
-        <div className="max-w-[1260px] mx-auto px-8">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <p className="text-[#C89F5F] tracking-[0.3em] text-[10px] font-bold uppercase flex items-center justify-center gap-2">
-              <span>⊡</span> Follow Us on Instagram
-            </p>
-          </div>
-
-          {/* Images grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {[
-              "/images/hero-cake.png",
-              "/images/pastries-new.png",
-              "/images/hampers.png",
-              "/images/pastries-new.png",
-              "/images/hero-cake.png",
-            ].map((src, idx) => (
-              <motion.a
-                key={idx}
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeInUp}
-                transition={{ delay: idx * 0.08 }}
-                className="relative aspect-square rounded-2xl overflow-hidden group block"
-              >
-                <Image
-                  src={src}
-                  alt={`Instagram post ${idx + 1}`}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-[#C89F5F]/0 group-hover:bg-[#C89F5F]/20 transition-colors duration-300 flex items-center justify-center">
-                  <span className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity">⊡</span>
-                </div>
-              </motion.a>
-            ))}
           </div>
         </div>
       </section>
