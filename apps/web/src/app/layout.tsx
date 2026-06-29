@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import PWAInstaller from "@/components/PWAInstaller";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -19,6 +20,12 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Hasty Tasty",
+  },
 };
 
 export default function RootLayout({
@@ -32,6 +39,7 @@ export default function RootLayout({
       className={`${inter.variable} ${playfair.variable} h-full antialiased bg-background text-foreground`}
     >
       <body className="min-h-full flex flex-col">
+        <PWAInstaller />
         {children}
       </body>
     </html>

@@ -174,7 +174,7 @@ function ShopContent() {
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           
           {/* ── LEFT SIDEBAR (FILTERS) ── */}
-          <aside className="w-full lg:w-[260px] flex-shrink-0 bg-white rounded-2xl p-6 border border-[#F0EBE1] shadow-sm sticky top-28">
+          <aside className="w-full lg:w-[260px] flex-shrink-0 bg-white rounded-2xl p-6 border border-[#F0EBE1] shadow-sm lg:sticky lg:top-28">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[#3A1E14] font-bold font-heading text-lg">Filter By</h3>
               <button 
@@ -287,17 +287,17 @@ function ShopContent() {
                 Showing {currentProducts.length} of {processedProducts.length} products
               </p>
               
-              <div className="flex items-center gap-4">
-                <div className="relative">
+              <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-4">
+                <div className="relative flex-1 sm:flex-none">
                   <select 
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="appearance-none bg-white border border-[#EBE3D5] text-[#3A1E14] text-[13px] font-medium py-2 pl-4 pr-10 rounded-lg outline-none cursor-pointer shadow-sm hover:border-[#C89F5F] transition-colors"
+                    className="w-full sm:w-auto appearance-none bg-white border border-[#EBE3D5] text-[#3A1E14] text-[13px] font-medium py-2 pl-4 pr-10 rounded-lg outline-none cursor-pointer shadow-sm hover:border-[#C89F5F] transition-colors"
                   >
-                    <option value="popularity">Sort by: Popularity</option>
-                    <option value="price-asc">Sort by: Price (Low to High)</option>
-                    <option value="price-desc">Sort by: Price (High to Low)</option>
-                    <option value="newest">Sort by: Newest Arrivals</option>
+                    <option value="popularity">Sort: Popularity</option>
+                    <option value="price-asc">Sort: Price (Low to High)</option>
+                    <option value="price-desc">Sort: Price (High to Low)</option>
+                    <option value="newest">Sort: Newest</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
                 </div>
