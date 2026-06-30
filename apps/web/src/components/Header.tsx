@@ -440,9 +440,9 @@ export default function Header() {
                   )}
                 </div>
               </div>
-              
               <div className="flex-1 py-6 px-6 flex flex-col gap-6">
                 <Link href="/" className="text-[#3A1E14] font-medium text-lg border-b border-gray-50 pb-4" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+                <Link href="/shop" className="text-[#3A1E14] font-medium text-lg border-b border-gray-50 pb-4" onClick={() => setIsMobileMenuOpen(false)}>Shop</Link>
                 <div className="border-b border-gray-50 pb-4">
                   <span className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 block">Shop Categories</span>
                   <ul className="space-y-4 pl-2">
@@ -492,7 +492,7 @@ export default function Header() {
                     Login / Sign Up
                   </Link>
                 )}
-                <Link href="/track" className="w-full py-3 bg-white border border-[#EAE2DB] text-[#3A1E14] rounded-xl font-medium text-sm flex items-center justify-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                <Link href="/account/orders" className="w-full py-3 bg-white border border-[#EAE2DB] text-[#3A1E14] rounded-xl font-medium text-sm flex items-center justify-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
                   <Truck size={16} className="text-[#C89F5F]" /> Track Order
                 </Link>
               </div>
