@@ -320,14 +320,60 @@ export default function AdminCustomersPage() {
               <div className="border-t border-gray-100 pt-6">
                 <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Account Details</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[11px] text-gray-500 mb-1">Joined Date</p>
-                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedCustomer.createdAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-500 mb-1">Status</p>
-                    <p className="text-sm font-medium text-green-600">Active</p>
-                  </div>
+                   <div>
+                     <p className="text-[11px] text-gray-500 mb-1">Joined Date</p>
+                     <p className="text-sm font-medium text-gray-900">{formatDate(selectedCustomer.createdAt)}</p>
+                   </div>
+                   <div>
+                     <p className="text-[11px] text-gray-500 mb-1">Status</p>
+                     <p className="text-sm font-medium text-green-600">Active</p>
+                   </div>
+                </div>
+              </div>
+
+              {/* Reset Password */}
+              <div className="border-t border-gray-100 pt-6">
+                <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Reset Password</h4>
+                <div className="flex gap-2">
+                  <input 
+                    type="password"
+                    placeholder="Enter new password"
+                    id="new-password-input"
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#C89F5F]"
+                  />
+                  <button 
+                    onClick={async () => {
+                      const input = document.getElementById('new-password-input') as HTMLInputElement;
+                      if (!input || !input.value) {
+                        setNotification({ message: "Please enter a new password.", type: "error" });
+                        return;
+                      }
+                      if (input.value.length < 6) {
+                        setNotification({ message: "Password must be at least 6 characters.", type: "error" });
+                        return;
+                      }
+                      try {
+                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers/${selectedCustomer.id}/reset-password`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ newPassword: input.value })
+                        });
+                        if (res.ok) {
+                          setNotification({ message: "Password reset successfully!", type: "success" });
+                          input.value = '';
+                        } else {
+                          const data = await res.json();
+                          setNotification({ message: data.error || "Failed to reset password.", type: "error" });
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        setNotification({ message: "An error occurred.", type: "error" });
+                      }
+                    }}
+                    className="bg-[#3A1E14] hover:bg-[#2A140B] text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    Reset
+                  </button>
                 </div>
               </div>
             </div>

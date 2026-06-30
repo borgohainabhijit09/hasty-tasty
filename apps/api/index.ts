@@ -767,6 +767,41 @@ app.delete("/api/customers/:id", async (req: Request, res: Response) => {
   }
 });
 
+// ── RESET CUSTOMER PASSWORD ──
+app.put("/api/customers/:id/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long" });
+    }
+
+    await runTransaction(async (client) => {
+      // 1. Update the Supabase Auth password in auth.users using crypt (bcrypt)
+      await client.query(`
+        UPDATE auth.users 
+        SET encrypted_password = crypt($1, gen_salt('bf')),
+            updated_at = NOW()
+        WHERE id = $2
+      `, [newPassword, id]);
+
+      // 2. Update the password in our public."User" table
+      return await client.query(`
+        UPDATE "User"
+        SET password = $1, "updatedAt" = NOW()
+        WHERE id = $2
+        RETURNING *
+      `, [newPassword, id]);
+    });
+
+    res.json({ message: "Password reset successfully!" });
+  } catch (error) {
+    console.error("FATAL ERROR IN PUT /api/customers/:id/reset-password:", error);
+    res.status(500).json({ error: "Failed to reset password", details: String(error) });
+  }
+});
+
 // ── GET B2B APPLICATIONS ──
 app.get("/api/b2b", async (req: Request, res: Response) => {
   try {

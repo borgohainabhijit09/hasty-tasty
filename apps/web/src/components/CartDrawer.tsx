@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 
 export default function CartDrawer() {
@@ -65,8 +66,18 @@ export default function CartDrawer() {
               ) : (
                 items.map((item) => (
                   <div key={item.id} className="flex gap-4 border-b border-gray-50 pb-6 last:border-0 last:pb-0">
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden shrink-0 border border-gray-200 flex items-center justify-center">
-                      <span className="text-gray-400 text-xs text-center px-2">Image<br/>Placeholder</span>
+                    <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden shrink-0 border border-gray-200 relative flex items-center justify-center">
+                      {item.image ? (
+                        <Image 
+                          src={item.image} 
+                          alt={item.name} 
+                          fill 
+                          sizes="80px"
+                          className="object-cover" 
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs text-center px-2">Image<br/>Placeholder</span>
+                      )}
                     </div>
                     <div className="flex-1 flex flex-col justify-between">
                       <div className="flex justify-between items-start gap-2">

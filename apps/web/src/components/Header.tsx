@@ -17,6 +17,7 @@ export default function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = useState(false);
   const { toggleDrawer, items: cartItems } = useCartStore();
 
   // Search State
@@ -444,24 +445,43 @@ export default function Header() {
                 <Link href="/" className="text-[#3A1E14] font-medium text-lg border-b border-gray-50 pb-4" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
                 <Link href="/shop" className="text-[#3A1E14] font-medium text-lg border-b border-gray-50 pb-4" onClick={() => setIsMobileMenuOpen(false)}>Shop</Link>
                 <div className="border-b border-gray-50 pb-4">
-                  <span className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 block">Shop Categories</span>
-                  <ul className="space-y-4 pl-2">
-                    {categories.length > 0 ? (
-                      categories.map((cat) => (
-                        <li key={cat.id}>
-                          <Link 
-                            href={`/shop?category=${cat.slug}`} 
-                            className="text-[#3A1E14] font-medium" 
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            {cat.name}
-                          </Link>
-                        </li>
-                      ))
-                    ) : (
-                      <li className="text-gray-400 text-xs">Loading...</li>
+                  <button 
+                    onClick={() => setIsMobileCategoriesOpen(!isMobileCategoriesOpen)}
+                    className="w-full flex items-center justify-between text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 cursor-pointer"
+                  >
+                    <span>Shop Categories</span>
+                    <span className={`text-[10px] transform transition-transform duration-200 ${isMobileCategoriesOpen ? 'rotate-180' : ''}`}>▼</span>
+                  </button>
+                  
+                  <AnimatePresence initial={false}>
+                    {isMobileCategoriesOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <ul className="space-y-4 pl-2 pt-2">
+                          {categories.length > 0 ? (
+                            categories.map((cat) => (
+                              <li key={cat.id}>
+                                <Link 
+                                  href={`/shop?category=${cat.slug}`} 
+                                  className="text-[#3A1E14] font-medium block" 
+                                  onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                  {cat.name}
+                                </Link>
+                              </li>
+                            ))
+                          ) : (
+                            <li className="text-gray-400 text-xs">Loading...</li>
+                          )}
+                        </ul>
+                      </motion.div>
                     )}
-                  </ul>
+                  </AnimatePresence>
                 </div>
                 {userRole !== 'CUSTOMER' && (
                   <Link href="/b2b" className="text-[#3A1E14] font-medium text-lg border-b border-gray-50 pb-4" onClick={() => setIsMobileMenuOpen(false)}>Wholesale / Corporate</Link>
