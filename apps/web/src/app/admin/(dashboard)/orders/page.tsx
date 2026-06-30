@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, Filter, RotateCcw, Eye, 
+  Search, Filter, RotateCcw, Eye, Trash2,
   ShoppingBag, CheckCircle, Clock, Truck,
   ChevronDown
 } from 'lucide-react';
@@ -19,10 +19,15 @@ export default function AdminOrdersPage() {
     revenue: 0
   });
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/orders`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/orders`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           setOrders(data);
@@ -42,6 +47,35 @@ export default function AdminOrdersPage() {
     };
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/orders`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+        
+        setKpis({
+          total: data.length,
+          pending: data.filter((o: any) => o.status === 'PENDING').length,
+          delivered: data.filter((o: any) => o.status === 'DELIVERED').length,
+          revenue: data.reduce((sum: number, o: any) => sum + o.totalAmount, 0)
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
@@ -72,26 +106,82 @@ export default function AdminOrdersPage() {
       });
       if (res.ok) {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        setNotification({ message: "Order status updated successfully!", type: "success" });
       } else {
-        alert("Failed to update status");
+        setNotification({ message: "Failed to update status", type: "error" });
       }
     } catch (e) {
       console.error(e);
-      alert("An error occurred");
+      setNotification({ message: "An error occurred", type: "error" });
+    }
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/orders/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] })
+      });
+      if (res.ok) {
+        setOrders(prev => prev.filter(o => o.id !== id));
+        setSelectedIds(prev => prev.filter(x => x !== id));
+        setNotification({ message: "Order deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete order.", type: "error" });
+      }
+    } catch (error) {
+      console.error(error);
+      setNotification({ message: "An error occurred.", type: "error" });
+    } finally {
+      setDeleteConfirm({ isOpen: false, id: null });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/orders/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      });
+      if (res.ok) {
+        setOrders(prev => prev.filter(o => !selectedIds.includes(o.id)));
+        setSelectedIds([]);
+        setNotification({ message: "Selected orders deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete selected orders.", type: "error" });
+      }
+    } catch (error) {
+      console.error(error);
+      setNotification({ message: "An error occurred during deletion.", type: "error" });
+    } finally {
+      setBulkDeleteConfirm(false);
     }
   };
 
   return (
     <div className="flex flex-col gap-8 max-w-[1600px] mx-auto pb-8">
       
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Orders</h1>
-        <div className="text-xs text-gray-500 flex items-center gap-2">
-          <Link href="/admin" className="hover:text-[#C89F5F]">Dashboard</Link>
-          <span>&gt;</span>
-          <span className="text-[#C89F5F]">Orders</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Orders</h1>
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            <Link href="/admin" className="hover:text-[#C89F5F]">Dashboard</Link>
+            <span>&gt;</span>
+            <span className="text-[#C89F5F]">Orders</span>
+          </div>
         </div>
+        
+        {selectedIds.length > 0 && (
+          <button 
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm self-end"
+          >
+            <Trash2 size={16} />
+            Delete Selected ({selectedIds.length})
+          </button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -167,6 +257,20 @@ export default function AdminOrdersPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                <th className="p-4 w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                    checked={orders.length > 0 && selectedIds.length === orders.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(orders.map(o => o.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                  />
+                </th>
                 <th className="p-4 font-bold">Order ID</th>
                 <th className="p-4 font-bold">Customer</th>
                 <th className="p-4 font-bold">Date</th>
@@ -178,15 +282,29 @@ export default function AdminOrdersPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-gray-500">Loading...</td>
+                  <td colSpan={7} className="p-10 text-center text-gray-500">Loading...</td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-gray-500">No orders found.</td>
+                  <td colSpan={7} className="p-10 text-center text-gray-500">No orders found.</td>
                 </tr>
               ) : (
                 orders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="p-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                        checked={selectedIds.includes(order.id)}
+                        onChange={() => {
+                          setSelectedIds(prev => 
+                            prev.includes(order.id)
+                              ? prev.filter(id => id !== order.id)
+                              : [...prev, order.id]
+                          );
+                        }}
+                      />
+                    </td>
                     <td className="p-4 text-sm font-mono text-gray-600">{order.id.slice(0,8).toUpperCase()}</td>
                     <td className="p-4">
                       <p className="text-sm font-bold text-gray-900">{order.customer?.name}</p>
@@ -212,9 +330,17 @@ export default function AdminOrdersPage() {
                       </select>
                     </td>
                     <td className="p-4 text-center">
-                      <button className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                        <Eye size={16} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm({ isOpen: true, id: order.id })}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -223,6 +349,79 @@ export default function AdminOrdersPage() {
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Order?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this order? This action cannot be undone.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setDeleteConfirm({isOpen: false, id: null})}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => deleteConfirm.id && handleDeleteOrder(deleteConfirm.id)}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Selected Orders?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete the {selectedIds.length} selected orders? This action cannot be undone.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Toast Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5 duration-350">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-xs font-bold border ${
+            notification.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            <span>{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-black/5 text-sm"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

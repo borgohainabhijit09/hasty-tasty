@@ -30,6 +30,9 @@ export default function AdminCategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -46,7 +49,7 @@ export default function AdminCategoriesPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setCategories(data);
@@ -61,6 +64,13 @@ export default function AdminCategoriesPage() {
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const openModal = (category: any = null) => {
     if (category) {
@@ -112,8 +122,9 @@ export default function AdminCategoriesPage() {
       if (res.ok) {
         await fetchCategories();
         closeModal();
+        setNotification({ message: "Category saved successfully!", type: "success" });
       } else {
-        alert("Failed to save category.");
+        setNotification({ message: "Failed to save category.", type: "error" });
       }
     } catch (error) {
       console.error("Save error:", error);
@@ -146,13 +157,37 @@ export default function AdminCategoriesPage() {
       });
       if (res.ok) {
         setCategories(prev => prev.filter(c => c.id !== id));
+        setNotification({ message: "Category deleted successfully!", type: "success" });
       } else {
-        alert("Failed to delete category.");
+        setNotification({ message: "Failed to delete category.", type: "error" });
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error("Delete error:", error);
+      setNotification({ message: "An error occurred.", type: "error" });
     } finally {
       setDeleteConfirm({isOpen: false, id: null});
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      });
+      if (res.ok) {
+        setCategories(prev => prev.filter(c => !selectedIds.includes(c.id)));
+        setSelectedIds([]);
+        setNotification({ message: "Selected categories deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete selected categories.", type: "error" });
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      setNotification({ message: "An error occurred during deletion.", type: "error" });
+    } finally {
+      setBulkDeleteConfirm(false);
     }
   };
 
@@ -170,14 +205,23 @@ export default function AdminCategoriesPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-           <button 
-             onClick={() => openModal()}
-             className="bg-[#3A1E14] hover:bg-[#2A080C] text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-           >
-             <Plus size={18} />
-             Add New Category
-           </button>
+        <div className="flex items-center gap-3">
+          {selectedIds.length > 0 && (
+            <button 
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <Trash2 size={16} />
+              Delete Selected ({selectedIds.length})
+            </button>
+          )}
+          <button 
+            onClick={() => openModal()}
+            className="bg-[#3A1E14] hover:bg-[#2A080C] text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            Add New Category
+          </button>
         </div>
       </div>
 
@@ -252,7 +296,18 @@ export default function AdminCategoriesPage() {
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 <th className="p-4 w-12 text-center">
-                   <input type="checkbox" className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" />
+                   <input 
+                     type="checkbox" 
+                     className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                     checked={processedCategories.length > 0 && selectedIds.length === processedCategories.length}
+                     onChange={(e) => {
+                       if (e.target.checked) {
+                         setSelectedIds(processedCategories.map(c => c.id));
+                       } else {
+                         setSelectedIds([]);
+                       }
+                     }}
+                   />
                 </th>
                 <th className="p-4 font-bold">Category</th>
                 <th className="p-4 font-bold">Slug</th>
@@ -280,7 +335,18 @@ export default function AdminCategoriesPage() {
                   return (
                     <tr key={category.id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="p-4 text-center">
-                        <input type="checkbox" className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" />
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                          checked={selectedIds.includes(category.id)}
+                          onChange={() => {
+                            setSelectedIds(prev => 
+                              prev.includes(category.id)
+                                ? prev.filter(id => id !== category.id)
+                                : [...prev, category.id]
+                            );
+                          }}
+                        />
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -529,6 +595,52 @@ export default function AdminCategoriesPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Selected Categories?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete the {selectedIds.length} selected categories? This action cannot be undone.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Toast Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5 duration-350">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-xs font-bold border ${
+            notification.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            <span>{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-black/5 text-sm"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

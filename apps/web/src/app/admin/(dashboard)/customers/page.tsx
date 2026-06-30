@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Users, Star, TrendingUp, Mail,
-  ChevronDown
+  ChevronDown, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -11,6 +11,41 @@ export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomers(data);
+        
+        const currentMonth = new Date().getMonth();
+        
+        setKpis({
+          total: data.length,
+          b2b: data.filter((c: any) => c.role === 'B2B_CUSTOMER').length,
+          newThisMonth: data.filter((c: any) => new Date(c.createdAt).getMonth() === currentMonth).length
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch customers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const [kpis, setKpis] = useState({
     total: 0,
@@ -21,7 +56,7 @@ export default function AdminCustomersPage() {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           setCustomers(data);
@@ -43,6 +78,50 @@ export default function AdminCustomersPage() {
     fetchCustomers();
   }, []);
 
+  const handleDeleteCustomer = async (id: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] })
+      });
+      if (res.ok) {
+        setCustomers(prev => prev.filter(c => c.id !== id));
+        setSelectedIds(prev => prev.filter(x => x !== id));
+        setNotification({ message: "Customer deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete customer.", type: "error" });
+      }
+    } catch (error) {
+      console.error(error);
+      setNotification({ message: "An error occurred.", type: "error" });
+    } finally {
+      setDeleteConfirm({ isOpen: false, id: null });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/customers/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      });
+      if (res.ok) {
+        setCustomers(prev => prev.filter(c => !selectedIds.includes(c.id)));
+        setSelectedIds([]);
+        setNotification({ message: "Selected customers deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete selected customers.", type: "error" });
+      }
+    } catch (error) {
+      console.error(error);
+      setNotification({ message: "An error occurred during deletion.", type: "error" });
+    } finally {
+      setBulkDeleteConfirm(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -51,14 +130,25 @@ export default function AdminCustomersPage() {
   return (
     <div className="flex flex-col gap-8 max-w-[1600px] mx-auto pb-8">
       
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Customers</h1>
-        <div className="text-xs text-gray-500 flex items-center gap-2">
-          <Link href="/admin" className="hover:text-[#C89F5F]">Dashboard</Link>
-          <span>&gt;</span>
-          <span className="text-[#C89F5F]">Customers</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Customers</h1>
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            <Link href="/admin" className="hover:text-[#C89F5F]">Dashboard</Link>
+            <span>&gt;</span>
+            <span className="text-[#C89F5F]">Customers</span>
+          </div>
         </div>
+        
+        {selectedIds.length > 0 && (
+          <button 
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm self-end"
+          >
+            <Trash2 size={16} />
+            Delete Selected ({selectedIds.length})
+          </button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -105,6 +195,20 @@ export default function AdminCustomersPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                <th className="p-4 w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                    checked={customers.length > 0 && selectedIds.length === customers.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(customers.map(c => c.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                  />
+                </th>
                 <th className="p-4 font-bold">Name</th>
                 <th className="p-4 font-bold">Contact</th>
                 <th className="p-4 font-bold">Role</th>
@@ -115,15 +219,29 @@ export default function AdminCustomersPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-10 text-center text-gray-500">Loading...</td>
+                  <td colSpan={6} className="p-10 text-center text-gray-500">Loading...</td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-10 text-center text-gray-500">No customers found.</td>
+                  <td colSpan={6} className="p-10 text-center text-gray-500">No customers found.</td>
                 </tr>
               ) : (
                 customers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="p-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                        checked={selectedIds.includes(customer.id)}
+                        onChange={() => {
+                          setSelectedIds(prev => 
+                            prev.includes(customer.id)
+                              ? prev.filter(id => id !== customer.id)
+                              : [...prev, customer.id]
+                          );
+                        }}
+                      />
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-orange-100 text-[#C89F5F] flex items-center justify-center font-bold text-sm">
@@ -145,7 +263,15 @@ export default function AdminCustomersPage() {
                     </td>
                     <td className="p-4 text-sm text-gray-600">{formatDate(customer.createdAt)}</td>
                     <td className="p-4 text-center">
-                       <button onClick={() => setSelectedCustomer(customer)} className="text-sm text-[#C89F5F] font-medium hover:underline">View Profile</button>
+                      <div className="flex items-center justify-center gap-3">
+                        <button onClick={() => setSelectedCustomer(customer)} className="text-sm text-[#C89F5F] font-medium hover:underline">View Profile</button>
+                        <button 
+                          onClick={() => setDeleteConfirm({ isOpen: true, id: customer.id })}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -214,6 +340,79 @@ export default function AdminCustomersPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Customer?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this customer? All their orders, reviews, addresses, and profiles will be permanently removed.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setDeleteConfirm({isOpen: false, id: null})}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => deleteConfirm.id && handleDeleteCustomer(deleteConfirm.id)}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Selected Customers?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete the {selectedIds.length} selected customers? All their associated data (orders, reviews, addresses) will be permanently removed.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Toast Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5 duration-350">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-xs font-bold border ${
+            notification.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            <span>{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-black/5 text-sm"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

@@ -1,10 +1,10 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { prisma } from "database";
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 import type { Category, ProductImage, PricingTier } from "@prisma/client";
 
-// Trigger restart for database changes - limit 3
+// Trigger restart for database changes - limit 4
 const app = express();
 
 const pool = new Pool({
@@ -12,10 +12,25 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false
   },
-  max: 5,
+  max: 3,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });
+
+async function runTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 100): Promise<T> {
   let attempt = 0;
@@ -130,23 +145,37 @@ app.post("/api/categories", async (req: Request, res: Response) => {
   }
 });
 
+// ── CATEGORIES BULK DELETE ──
+app.delete("/api/categories/bulk", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs must be a non-empty array" });
+    }
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "ProductCategory" WHERE "categoryId" = ANY($1)`, [ids]);
+      return await client.query(`DELETE FROM "Category" WHERE id = ANY($1) RETURNING *`, [ids]);
+    });
+    return res.json({ message: `${result.rowCount} categories deleted successfully` });
+  } catch (error) {
+    console.error("Error in bulk delete categories:", error);
+    return res.status(500).json({ error: "Failed to delete categories", details: String(error) });
+  }
+});
+
 app.delete("/api/categories/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await pool.query('BEGIN');
-    
-    await pool.query(`DELETE FROM "ProductCategory" WHERE "categoryId" = $1`, [id]);
-    const result = await pool.query(`DELETE FROM "Category" WHERE id = $1 RETURNING *`, [id]);
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "ProductCategory" WHERE "categoryId" = $1`, [id]);
+      return await client.query(`DELETE FROM "Category" WHERE id = $1 RETURNING *`, [id]);
+    });
     
     if (result.rows.length === 0) {
-      await pool.query('ROLLBACK');
       return res.status(404).json({ error: "Category not found" });
     }
-    
-    await pool.query('COMMIT');
     res.json({ message: "Category deleted successfully" });
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error("FATAL ERROR IN DELETE /api/categories/:id:", error);
     res.status(500).json({ error: "Failed to delete category", details: String(error) });
   }
@@ -348,39 +377,36 @@ app.post("/api/products", async (req: Request, res: Response) => {
 
     const cuid = 'p' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
     
-    // Begin Transaction
-    await pool.query('BEGIN');
+    const product = await runTransaction(async (client) => {
+      const result = await client.query(`
+        INSERT INTO "Product" (id, name, slug, sku, description, "basePrice", "b2bPrice", stock, "isActive", "updatedAt") 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) 
+        RETURNING *
+      `, [cuid, name, slug, sku || null, description || '', basePrice, b2bPrice !== '' && b2bPrice !== undefined && b2bPrice !== null ? Number(b2bPrice) : null, stock || 0, isActive !== undefined ? isActive : true]);
 
-    const result = await pool.query(`
-      INSERT INTO "Product" (id, name, slug, sku, description, "basePrice", "b2bPrice", stock, "isActive", "updatedAt") 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) 
-      RETURNING *
-    `, [cuid, name, slug, sku || null, description || '', basePrice, b2bPrice !== '' && b2bPrice !== undefined && b2bPrice !== null ? Number(b2bPrice) : null, stock || 0, isActive !== undefined ? isActive : true]);
-
-    const product = result.rows[0];
-
-    if (categoryIds && Array.isArray(categoryIds)) {
-      for (const catId of categoryIds) {
-        await pool.query(`
-          INSERT INTO "ProductCategory" ("productId", "categoryId")
-          VALUES ($1, $2)
-          ON CONFLICT DO NOTHING
-        `, [cuid, catId]);
+      if (categoryIds && Array.isArray(categoryIds)) {
+        for (const catId of categoryIds) {
+          await client.query(`
+            INSERT INTO "ProductCategory" ("productId", "categoryId")
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+          `, [cuid, catId]);
+        }
       }
-    }
 
-    if (imageUrl) {
-      const imageId = 'pi' + Math.random().toString(36).substring(2, 10);
-      await pool.query(`
-        INSERT INTO "ProductImage" (id, "productId", url, "isPrimary")
-        VALUES ($1, $2, $3, true)
-      `, [imageId, cuid, imageUrl]);
-    }
+      if (imageUrl) {
+        const imageId = 'pi' + Math.random().toString(36).substring(2, 10);
+        await client.query(`
+          INSERT INTO "ProductImage" (id, "productId", url, "isPrimary")
+          VALUES ($1, $2, $3, true)
+        `, [imageId, cuid, imageUrl]);
+      }
+      
+      return result.rows[0];
+    });
 
-    await pool.query('COMMIT');
     res.status(201).json(product);
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error("FATAL ERROR IN POST /api/products:", error);
     res.status(500).json({ error: "Failed to create product", details: String(error) });
   }
@@ -391,92 +417,107 @@ app.post("/api/products", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, slug, sku, description, basePrice, b2bPrice, stock, categoryIds, isActive, imageUrl } = req.body;
     
-    // In the inline dropdown edit, we might only send categoryIds
-    // So we don't strictly require name, slug, basePrice if it's a partial update.
-    // However, since we are doing a PUT, we'll fetch existing if missing.
-    // Actually, the easiest fix for partial PUT is to build the SET dynamically.
     if (!name && !categoryIds) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    await pool.query('BEGIN');
+    const product = await runTransaction(async (client) => {
+      let result;
+      if (name) {
+        result = await client.query(`
+          UPDATE "Product" 
+          SET name = $1, slug = $2, sku = $3, description = $4, "basePrice" = $5, "b2bPrice" = $6, stock = $7, "isActive" = $8, "updatedAt" = NOW()
+          WHERE id = $9 
+          RETURNING *
+        `, [name, slug, sku || null, description || '', basePrice, b2bPrice !== '' && b2bPrice !== undefined && b2bPrice !== null ? Number(b2bPrice) : null, stock || 0, isActive !== undefined ? isActive : true, id]);
+      } else {
+        result = await client.query(`SELECT * FROM "Product" WHERE id = $1`, [id]);
+      }
 
-    let result;
-    if (name) {
-      result = await pool.query(`
-        UPDATE "Product" 
-        SET name = $1, slug = $2, sku = $3, description = $4, "basePrice" = $5, "b2bPrice" = $6, stock = $7, "isActive" = $8, "updatedAt" = NOW()
-        WHERE id = $9 
-        RETURNING *
-      `, [name, slug, sku || null, description || '', basePrice, b2bPrice !== '' && b2bPrice !== undefined && b2bPrice !== null ? Number(b2bPrice) : null, stock || 0, isActive !== undefined ? isActive : true, id]);
-    } else {
-      result = await pool.query(`SELECT * FROM "Product" WHERE id = $1`, [id]);
-    }
+      if (result.rows.length === 0) {
+        throw new Error("Product not found");
+      }
 
-    if (result.rows.length === 0) {
-      await pool.query('ROLLBACK');
+      if (categoryIds && Array.isArray(categoryIds)) {
+        await client.query(`DELETE FROM "ProductCategory" WHERE "productId" = $1`, [id]);
+        for (const catId of categoryIds) {
+          await client.query(`
+            INSERT INTO "ProductCategory" ("productId", "categoryId")
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+          `, [id, catId]);
+        }
+      }
+
+      if (imageUrl !== undefined) {
+        await client.query(`DELETE FROM "ProductImage" WHERE "productId" = $1`, [id]);
+        if (imageUrl) {
+          const imageId = 'pi' + Math.random().toString(36).substring(2, 10);
+          await client.query(`
+            INSERT INTO "ProductImage" (id, "productId", url, "isPrimary")
+            VALUES ($1, $2, $3, true)
+          `, [imageId, id, imageUrl]);
+        }
+      }
+      
+      return result.rows[0];
+    });
+
+    res.json(product);
+  } catch (error: any) {
+    console.error("FATAL ERROR IN PUT /api/products/:id:", error);
+    if (error.message === "Product not found") {
       return res.status(404).json({ error: "Product not found" });
     }
-
-    if (categoryIds && Array.isArray(categoryIds)) {
-      // Delete old mapping
-      await pool.query(`DELETE FROM "ProductCategory" WHERE "productId" = $1`, [id]);
-      
-      // Insert new mapping
-      for (const catId of categoryIds) {
-        await pool.query(`
-          INSERT INTO "ProductCategory" ("productId", "categoryId")
-          VALUES ($1, $2)
-          ON CONFLICT DO NOTHING
-        `, [id, catId]);
-      }
-    }
-
-    if (imageUrl !== undefined) {
-      await pool.query(`DELETE FROM "ProductImage" WHERE "productId" = $1`, [id]);
-      if (imageUrl) {
-        const imageId = 'pi' + Math.random().toString(36).substring(2, 10);
-        await pool.query(`
-          INSERT INTO "ProductImage" (id, "productId", url, "isPrimary")
-          VALUES ($1, $2, $3, true)
-        `, [imageId, id, imageUrl]);
-      }
-    }
-
-    await pool.query('COMMIT');
-    res.json(result.rows[0]);
-  } catch (error) {
-    await pool.query('ROLLBACK');
-    console.error("FATAL ERROR IN PUT /api/products/:id:", error);
     res.status(500).json({ error: "Failed to update product", details: String(error) });
+  }
+});
+
+// ── PRODUCTS BULK DELETE ──
+app.delete("/api/products/bulk", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs must be a non-empty array" });
+    }
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "ProductCategory" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "ProductImage" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "PricingTier" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "OrderItem" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "Review" WHERE "productId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "Wishlist" WHERE "productId" = ANY($1)`, [ids]);
+      return await client.query(`DELETE FROM "Product" WHERE id = ANY($1) RETURNING *`, [ids]);
+    });
+    return res.json({ message: `${result.rowCount} products deleted successfully` });
+  } catch (error) {
+    console.error("Error in bulk delete products:", error);
+    return res.status(500).json({ error: "Failed to delete products", details: String(error) });
   }
 });
 
 app.delete("/api/products/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await pool.query('BEGIN');
-    
-    // Delete dependent records first (or rely on ON DELETE CASCADE in Prisma)
-    await pool.query(`DELETE FROM "ProductCategory" WHERE "productId" = $1`, [id]);
-    await pool.query(`DELETE FROM "ProductImage" WHERE "productId" = $1`, [id]);
-    await pool.query(`DELETE FROM "PricingTier" WHERE "productId" = $1`, [id]);
-    await pool.query(`DELETE FROM "Review" WHERE "productId" = $1`, [id]);
-    
-    // Check if it's referenced in OrderItem or EnquiryItem (cannot delete easily, so catch error)
-    const result = await pool.query(`DELETE FROM "Product" WHERE id = $1 RETURNING *`, [id]);
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "ProductCategory" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "ProductImage" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "PricingTier" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "Review" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "Wishlist" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "OrderItem" WHERE "productId" = $1`, [id]);
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "productId" = $1`, [id]);
+      return await client.query(`DELETE FROM "Product" WHERE id = $1 RETURNING *`, [id]);
+    });
     
     if (result.rows.length === 0) {
-      await pool.query('ROLLBACK');
       return res.status(404).json({ error: "Product not found" });
     }
-    
-    await pool.query('COMMIT');
     res.json({ message: "Product deleted successfully" });
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error("FATAL ERROR IN DELETE /api/products/:id:", error);
-    res.status(500).json({ error: "Failed to delete product (it might be referenced in orders)", details: String(error) });
+    res.status(500).json({ error: "Failed to delete product", details: String(error) });
   }
 });
 
@@ -624,6 +665,42 @@ app.put("/api/orders/:id/status", async (req: Request, res: Response) => {
   }
 });
 
+// ── ORDERS BULK DELETE ──
+app.delete("/api/orders/bulk", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs must be a non-empty array" });
+    }
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "OrderItem" WHERE "orderId" = ANY($1)`, [ids]);
+      return await client.query(`DELETE FROM "Order" WHERE id = ANY($1) RETURNING *`, [ids]);
+    });
+    return res.json({ message: `${result.rowCount} orders deleted successfully` });
+  } catch (error) {
+    console.error("Error in bulk delete orders:", error);
+    return res.status(500).json({ error: "Failed to delete orders", details: String(error) });
+  }
+});
+
+// ── DELETE SINGLE ORDER ──
+app.delete("/api/orders/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "OrderItem" WHERE "orderId" = $1`, [id]);
+      return await client.query(`DELETE FROM "Order" WHERE id = $1 RETURNING *`, [id]);
+    });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.json({ message: "Order deleted successfully" });
+  } catch (error) {
+    console.error("FATAL ERROR IN DELETE /api/orders/:id:", error);
+    res.status(500).json({ error: "Failed to delete order", details: String(error) });
+  }
+});
+
 // ── GET CUSTOMERS ──
 app.get("/api/customers", async (req: Request, res: Response) => {
   try {
@@ -637,6 +714,56 @@ app.get("/api/customers", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("FATAL ERROR IN GET /api/customers:", error);
     res.status(500).json({ error: "Failed to fetch customers" });
+  }
+});
+
+// ── CUSTOMERS BULK DELETE ──
+app.delete("/api/customers/bulk", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs must be a non-empty array" });
+    }
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "BusinessProfile" WHERE "userId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "Address" WHERE "userId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "Review" WHERE "userId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "Wishlist" WHERE "userId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "OrderItem" WHERE "orderId" IN (SELECT id FROM "Order" WHERE "userId" = ANY($1))`, [ids]);
+      await client.query(`DELETE FROM "Order" WHERE "userId" = ANY($1)`, [ids]);
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "enquiryId" IN (SELECT id FROM "Enquiry" WHERE "userId" = ANY($1))`, [ids]);
+      await client.query(`DELETE FROM "Enquiry" WHERE "userId" = ANY($1)`, [ids]);
+      return await client.query(`DELETE FROM "User" WHERE id = ANY($1) AND role != 'SUPER_ADMIN' RETURNING *`, [ids]);
+    });
+    return res.json({ message: `${result.rowCount} customers deleted successfully` });
+  } catch (error) {
+    console.error("Error in bulk delete customers:", error);
+    return res.status(500).json({ error: "Failed to delete customers", details: String(error) });
+  }
+});
+
+// ── DELETE SINGLE CUSTOMER ──
+app.delete("/api/customers/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "BusinessProfile" WHERE "userId" = $1`, [id]);
+      await client.query(`DELETE FROM "Address" WHERE "userId" = $1`, [id]);
+      await client.query(`DELETE FROM "Review" WHERE "userId" = $1`, [id]);
+      await client.query(`DELETE FROM "Wishlist" WHERE "userId" = $1`, [id]);
+      await client.query(`DELETE FROM "OrderItem" WHERE "orderId" IN (SELECT id FROM "Order" WHERE "userId" = $1)`, [id]);
+      await client.query(`DELETE FROM "Order" WHERE "userId" = $1`, [id]);
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "enquiryId" IN (SELECT id FROM "Enquiry" WHERE "userId" = $1)`, [id]);
+      await client.query(`DELETE FROM "Enquiry" WHERE "userId" = $1`, [id]);
+      return await client.query(`DELETE FROM "User" WHERE id = $1 AND role != 'SUPER_ADMIN' RETURNING *`, [id]);
+    });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    res.json({ message: "Customer deleted successfully" });
+  } catch (error) {
+    console.error("FATAL ERROR IN DELETE /api/customers/:id:", error);
+    res.status(500).json({ error: "Failed to delete customer", details: String(error) });
   }
 });
 
@@ -696,6 +823,42 @@ app.put("/api/enquiries/:id/status", async (req: Request, res: Response) => {
   }
 });
 
+// ── ENQUIRIES BULK DELETE ──
+app.delete("/api/enquiries/bulk", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs must be a non-empty array" });
+    }
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "enquiryId" = ANY($1)`, [ids]);
+      return await client.query(`DELETE FROM "Enquiry" WHERE id = ANY($1) RETURNING *`, [ids]);
+    });
+    return res.json({ message: `${result.rowCount} enquiries deleted successfully` });
+  } catch (error) {
+    console.error("Error in bulk delete enquiries:", error);
+    return res.status(500).json({ error: "Failed to delete enquiries", details: String(error) });
+  }
+});
+
+// ── DELETE SINGLE ENQUIRY ──
+app.delete("/api/enquiries/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await runTransaction(async (client) => {
+      await client.query(`DELETE FROM "EnquiryItem" WHERE "enquiryId" = $1`, [id]);
+      return await client.query(`DELETE FROM "Enquiry" WHERE id = $1 RETURNING *`, [id]);
+    });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Enquiry not found" });
+    }
+    res.json({ message: "Enquiry deleted successfully" });
+  } catch (error) {
+    console.error("FATAL ERROR IN DELETE /api/enquiries/:id:", error);
+    res.status(500).json({ error: "Failed to delete enquiry", details: String(error) });
+  }
+});
+
 // ── GET USERS ME ──
 app.get("/api/users/me", async (req: Request, res: Response) => {
   try {
@@ -719,6 +882,9 @@ app.get("/api/users/me", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ── BULK DELETE ENDPOINTS ──
+// Moved to respective sections to prevent Express routing conflicts with :id routes.
 
 // Trigger nodemon restart after types installation
 const PORT = process.env.PORT || 8080;

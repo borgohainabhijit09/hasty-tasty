@@ -25,6 +25,9 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -45,7 +48,7 @@ export default function AdminProductsPage() {
   useEffect(() => {
     const fetchCats = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/categories`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           const sorted = data.sort((a: any, b: any) => a.name.localeCompare(b.name));
@@ -55,6 +58,13 @@ export default function AdminProductsPage() {
     };
     fetchCats();
   }, []);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const openModal = (product: any = null) => {
     if (product) {
@@ -111,24 +121,23 @@ export default function AdminProductsPage() {
 
       if (res.ok) {
         // refetch products
-        const productsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`);
+        const productsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`, { cache: 'no-store' });
         if (productsRes.ok) {
           const data = await productsRes.json();
           setProducts(data);
         }
         closeModal();
+        setNotification({ message: "Product saved successfully!", type: "success" });
       } else {
-        alert("Failed to save product.");
+        setNotification({ message: "Failed to save product.", type: "error" });
       }
     } catch (error) {
       console.error("Save error:", error);
+      setNotification({ message: "An error occurred during saving.", type: "error" });
     } finally {
       setFormSaving(false);
     }
   };
-
-
-
   const handleDeleteProduct = async (id: string) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products/${id}`, {
@@ -136,20 +145,44 @@ export default function AdminProductsPage() {
       });
       if (res.ok) {
         setProducts(prev => prev.filter(p => p.id !== id));
+        setNotification({ message: "Product deleted successfully!", type: "success" });
       } else {
-        alert("Failed to delete product. It may be referenced in orders.");
+        setNotification({ message: "Failed to delete product. It may be referenced in orders.", type: "error" });
       }
     } catch (e) {
       console.error(e);
+      setNotification({ message: "An error occurred.", type: "error" });
     } finally {
       setDeleteConfirm({isOpen: false, id: null});
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products/bulk`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      });
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => !selectedIds.includes(p.id)));
+        setSelectedIds([]);
+        setNotification({ message: "Selected products deleted successfully!", type: "success" });
+      } else {
+        setNotification({ message: "Failed to delete selected products.", type: "error" });
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      setNotification({ message: "An error occurred during deletion.", type: "error" });
+    } finally {
+      setBulkDeleteConfirm(false);
     }
   };
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/products`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           setProducts(data);
@@ -225,20 +258,23 @@ export default function AdminProductsPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-           {/* Reusing header right-side from dashboard or letting the layout handle it. 
-               The screenshot shows search, bell, profile at the very top. 
-               Since it's in the page here, we'll replicate a simplified version or just skip it as layout might have it. 
-               Actually, the image shows it as part of the top nav which we already built in layout. 
-               Wait, our layout doesn't have the top nav, it has sidebar. We put the top nav in page.tsx previously. 
-               I'll replicate just the Add New Product button here and keep it clean. */}
-           <button 
-             onClick={() => openModal()}
-             className="bg-[#3A1E14] hover:bg-[#2A080C] text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-           >
-             <Plus size={18} />
-             Add New Product
-           </button>
+        <div className="flex items-center gap-3">
+          {selectedIds.length > 0 && (
+            <button 
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <Trash2 size={16} />
+              Delete Selected ({selectedIds.length})
+            </button>
+          )}
+          <button 
+            onClick={() => openModal()}
+            className="bg-[#3A1E14] hover:bg-[#2A080C] text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            Add New Product
+          </button>
         </div>
       </div>
 
@@ -387,7 +423,18 @@ export default function AdminProductsPage() {
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 <th className="p-4 w-12 text-center">
-                   <input type="checkbox" className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" />
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                      checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(filteredProducts.map(p => p.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                    />
                 </th>
                 <th className="p-4 font-bold">Product</th>
                 <th className="p-4 font-bold">SKU</th>
@@ -422,7 +469,18 @@ export default function AdminProductsPage() {
                   return (
                     <tr key={product.id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="p-4 text-center">
-                        <input type="checkbox" className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" />
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-[#C89F5F] focus:ring-[#C89F5F]" 
+                          checked={selectedIds.includes(product.id)}
+                          onChange={() => {
+                            setSelectedIds(prev => 
+                              prev.includes(product.id)
+                                ? prev.filter(id => id !== product.id)
+                                : [...prev, product.id]
+                            );
+                          }}
+                        />
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3 max-w-[280px]">
@@ -773,7 +831,7 @@ export default function AdminProductsPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
               <Trash2 size={24} />
@@ -794,6 +852,52 @@ export default function AdminProductsPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Selected Products?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete the {selectedIds.length} selected products? This action cannot be undone.</p>
+            <div className="flex items-center gap-3 w-full">
+              <button 
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Toast Notification */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5 duration-350">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-xs font-bold border ${
+            notification.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            <span>{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-black/5 text-sm"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

@@ -19,7 +19,7 @@ export default function AdminReportsPage() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/dashboard`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/dashboard`, { cache: 'no-store' });
         if (res.ok) {
           const dashboardData = await res.json();
           setData(dashboardData);
