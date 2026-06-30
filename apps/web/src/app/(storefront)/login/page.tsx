@@ -7,7 +7,6 @@ import { ArrowRight, Lock, Mail } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 import { login } from "./actions";
 
-import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 const fadeInUp = {
@@ -23,8 +22,17 @@ export default function LoginPage() {
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetPending, setResetPending] = useState(false);
 
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const [redirectTo, setRedirectTo] = useState("/");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const redir = params.get("redirect");
+      if (redir) {
+        setRedirectTo(redir);
+      }
+    }
+  }, []);
 
   async function handleSubmit(formData: FormData) {
     setIsPending(true);
