@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type CartItem = {
   id: string;
@@ -19,31 +20,38 @@ interface CartState {
   setDrawerOpen: (isOpen: boolean) => void;
 }
 
-export const useCartStore = create<CartState>((set) => ({
-  items: [],
-  isDrawerOpen: false,
-  addItem: (item) =>
-    set((state) => {
-      const existingItem = state.items.find((i) => i.id === item.id);
-      if (existingItem) {
-        return {
-          items: state.items.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
-          ),
-          isDrawerOpen: true, // Automatically open drawer on adding
-        };
-      }
-      return { items: [...state.items, item], isDrawerOpen: true };
+export const useCartStore = create<CartState>()(
+  persist(
+    (set) => ({
+      items: [],
+      isDrawerOpen: false,
+      addItem: (item) =>
+        set((state) => {
+          const existingItem = state.items.find((i) => i.id === item.id);
+          if (existingItem) {
+            return {
+              items: state.items.map((i) =>
+                i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+              ),
+              isDrawerOpen: true, // Automatically open drawer on adding
+            };
+          }
+          return { items: [...state.items, item], isDrawerOpen: true };
+        }),
+      removeItem: (id) =>
+        set((state) => ({
+          items: state.items.filter((i) => i.id !== id),
+        })),
+      updateQuantity: (id, quantity) =>
+        set((state) => ({
+          items: state.items.map((i) => (i.id === id ? { ...i, quantity } : i)),
+        })),
+      clearCart: () => set({ items: [] }),
+      toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
+      setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
     }),
-  removeItem: (id) =>
-    set((state) => ({
-      items: state.items.filter((i) => i.id !== id),
-    })),
-  updateQuantity: (id, quantity) =>
-    set((state) => ({
-      items: state.items.map((i) => (i.id === id ? { ...i, quantity } : i)),
-    })),
-  clearCart: () => set({ items: [] }),
-  toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
-  setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
-}));
+    {
+      name: 'hasty-tasty-cart', // unique name for localStorage key
+    }
+  )
+);

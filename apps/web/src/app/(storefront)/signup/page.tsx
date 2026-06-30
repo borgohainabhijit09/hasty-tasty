@@ -17,10 +17,15 @@ export default function SignupPage() {
 
   const [isB2B, setIsB2B] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [redirectTo, setRedirectTo] = useState("/");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      const redir = params.get("redirect");
+      if (redir) {
+        setRedirectTo(redir);
+      }
       if (params.get("b2b") === "true") {
         setIsB2B(true);
       }
@@ -32,23 +37,32 @@ export default function SignupPage() {
     setError(null);
     setSuccess(null);
     
-    // Switch between regular and b2b signup actions
-    let result;
-    if (isB2B) {
-      const { b2bSignup } = await import('../login/actions');
-      result = await b2bSignup(formData);
-      if (result?.success) {
-        setSuccess("Thank you! Your B2B wholesale application has been submitted and is currently pending admin approval. We will contact you shortly.");
-        setIsPending(false);
-        return;
+    try {
+      // Switch between regular and b2b signup actions
+      let result;
+      if (isB2B) {
+        const { b2bSignup } = await import('../login/actions');
+        result = await b2bSignup(formData);
+        if (result?.success) {
+          setSuccess("Thank you! Your B2B wholesale application has been submitted and is currently pending admin approval. We will contact you shortly.");
+          setIsPending(false);
+          return;
+        }
+      } else {
+        const { signup } = await import('../login/actions');
+        result = await signup(formData);
+        if (result?.success) {
+          window.location.replace(redirectTo);
+          return;
+        }
       }
-    } else {
-      const { signup } = await import('../login/actions');
-      result = await signup(formData);
-    }
-    
-    if (result?.error) {
-      setError(result.error);
+      
+      if (result?.error) {
+        setError(result.error);
+        setIsPending(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
       setIsPending(false);
     }
   }
@@ -120,18 +134,16 @@ export default function SignupPage() {
               />
             </div>
 
-            {isB2B && (
-              <div className="space-y-1.5 relative">
-                <label className="text-[13px] font-semibold text-[#3A1E14]">Phone Number *</label>
-                <input 
-                  type="tel" 
-                  name="phone"
-                  required
-                  placeholder="+91 98765 43210"
-                  className="w-full border border-[#EBE3D5] rounded-xl px-4 py-3 text-[14px] outline-none focus:border-[#C89F5F] transition-colors bg-[#FAF8F5]" 
-                />
-              </div>
-            )}
+            <div className="space-y-1.5 relative">
+              <label className="text-[13px] font-semibold text-[#3A1E14]">Phone Number *</label>
+              <input 
+                type="tel" 
+                name="phone"
+                required
+                placeholder="+91 98765 43210"
+                className="w-full border border-[#EBE3D5] rounded-xl px-4 py-3 text-[14px] outline-none focus:border-[#C89F5F] transition-colors bg-[#FAF8F5]" 
+              />
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-[13px] font-semibold text-[#3A1E14]">Password *</label>

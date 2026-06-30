@@ -6,10 +6,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 
+import { useState, useEffect } from "react";
+
 export default function CartDrawer() {
   const { items, isDrawerOpen, setDrawerOpen, removeItem, updateQuantity } = useCartStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const totalAmount = items.reduce((total, item) => total + item.price * item.quantity, 0);
+
+  if (!mounted) return null;
 
   return (
     <AnimatePresence>

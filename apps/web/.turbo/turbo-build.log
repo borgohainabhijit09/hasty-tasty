@@ -1,0 +1,4 @@
+
+> web@0.1.0 build
+> npx prisma generate --schema=../../packages/database/prisma/schema.prisma && next build
+

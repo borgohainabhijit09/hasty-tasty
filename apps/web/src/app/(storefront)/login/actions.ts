@@ -10,6 +10,7 @@ export async function login(formData: FormData) {
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const redirectTo = (formData.get('redirectTo') as string) || '/'
 
   const { data: authData, error } = await supabase.auth.signInWithPassword({
     email,
@@ -29,7 +30,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  return { success: true, redirectTo }
 }
 
 export async function signup(formData: FormData) {
@@ -38,6 +39,7 @@ export async function signup(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const name = formData.get('name') as string
+  const phone = formData.get('phone') as string
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -45,6 +47,7 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         name,
+        phone,
       },
     },
   })
@@ -60,20 +63,18 @@ export async function signup(formData: FormData) {
       email: data.user.email,
       password: password, // As required by your schema
       name: name,
+      phone: phone || null,
       role: 'CUSTOMER',
       updatedAt: new Date().toISOString()
     })
 
     if (dbError) {
       console.error('Failed to create user record in User table:', dbError)
-      // Note: In a production app, you might want to handle this edge case (e.g., delete the auth user if DB insert fails)
     }
   }
 
-  // After successful signup (with email confirmations disabled), 
-  // the user is automatically logged in.
   revalidatePath('/', 'layout')
-  redirect('/')
+  return { success: true }
 }
 
 export async function b2bSignup(formData: FormData) {

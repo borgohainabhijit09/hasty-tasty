@@ -4,7 +4,7 @@ import { prisma } from "database";
 import { Pool, PoolClient } from "pg";
 import type { Category, ProductImage, PricingTier } from "@prisma/client";
 
-// Trigger restart for database changes - limit 4
+// Trigger restart for database changes - limit 5
 const app = express();
 
 const pool = new Pool({

@@ -2,14 +2,28 @@
 
 import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity } = useCartStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
   const tax = subtotal * 0.05; // Dummy 5% tax
   const total = subtotal + tax;
+
+  if (!mounted) {
+    return (
+      <div className="max-w-[1260px] mx-auto px-8 py-20 text-center min-h-[60vh] flex flex-col justify-center items-center">
+        <p className="text-gray-400">Loading your cart...</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
