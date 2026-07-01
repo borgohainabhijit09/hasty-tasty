@@ -4,7 +4,7 @@ import { useCartStore } from "@/store/useCartStore";
 import Link from "next/link";
 import Image from "next/image";
 import { CheckCircle2, CreditCard, Truck, MapPin, Loader2, Plus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -17,15 +17,26 @@ export default function CheckoutPage() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   
   const [shippingRates, setShippingRates] = useState<Record<string, number>>({});
-  const [shippingCost, setShippingCost] = useState(0);
+  const [locationRate, setLocationRate] = useState(0);
   
   const [loading, setLoading] = useState(true);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [step, setStep] = useState(1); // 1 = Address, 2 = Payment
 
-  const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+  const adjustedItems = useMemo(() => {
+    if (locationRate <= 0 || items.length === 0) return items;
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalQty === 0) return items;
+    const markupPerUnit = locationRate / totalQty;
+    return items.map(item => ({
+      ...item,
+      price: Math.round((item.price + markupPerUnit) * 100) / 100
+    }));
+  }, [items, locationRate]);
+
+  const subtotal = adjustedItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const tax = 0; // No taxes for now per user request
-  const total = subtotal + tax + shippingCost;
+  const total = subtotal;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,49 +72,51 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (selectedAddress) {
-      const state = selectedAddress.state;
-      const rate = shippingRates[state] || 0; // fallback to 0 if owner hasn't set rate for this state
-      setShippingCost(rate);
+      const pin = selectedAddress.pinCode || "";
+      if (pin.startsWith("785")) {
+        setLocationRate(0);
+      } else {
+        const state = selectedAddress.state;
+        const rate = shippingRates[state] || 0;
+        setLocationRate(rate);
+      }
+    } else {
+      setLocationRate(0);
     }
   }, [selectedAddress, shippingRates]);
 
   const handlePlaceOrder = async () => {
-    if (!user || !selectedAddress || items.length === 0) return;
+    if (!user || !selectedAddress || adjustedItems.length === 0) return;
     setIsPlacingOrder(true);
-    const supabase = createClient();
-
+ 
     try {
-      // 1. Create Order
-      const orderId = 'ord_' + Math.random().toString(36).substring(2, 10);
-      const { error: orderError } = await supabase.from('Order').insert({
-        id: orderId,
-        userId: user.id,
-        addressId: selectedAddress.id,
-        status: 'CONFIRMED',
-        totalAmount: total,
-        taxAmount: tax,
-        shippingAmount: shippingCost,
-        notes: "COD"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const res = await fetch(`${apiUrl}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          totalAmount: total,
+          taxAmount: tax,
+          shippingAmount: locationRate,
+          notes: "COD",
+          addressId: selectedAddress.id,
+          items: adjustedItems.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            price: item.price
+          }))
+        })
       });
 
-      if (orderError) throw orderError;
-
-      // 2. Create Order Items
-      const orderItemsToInsert = items.map(item => ({
-        id: 'itm_' + Math.random().toString(36).substring(2, 10),
-        orderId: orderId,
-        productId: item.id,
-        quantity: item.quantity,
-        price: item.price
-      }));
-
-      const { error: itemsError } = await supabase.from('OrderItem').insert(orderItemsToInsert);
-      if (itemsError) throw itemsError;
-
-      // 3. Clear Cart & Redirect
+      if (!res.ok) throw new Error("Order API failed");
+      const orderData = await res.json();
+      const orderId = orderData.id;
+ 
+      // Clear Cart & Redirect
       clearCart();
       router.push(`/checkout/success?orderId=${orderId}`);
-
+ 
     } catch (err) {
       console.error("Order failed:", err);
       alert("There was an error placing your order. Please try again.");
@@ -250,25 +263,24 @@ export default function CheckoutPage() {
           <div className="lg:w-[40%]">
             <div className="bg-white rounded-xl p-5 border border-gray-200 sticky top-24 shadow-sm">
               <h3 className="font-heading font-bold text-lg text-[#3A1E14] mb-4 border-b border-gray-100 pb-3">Order Summary</h3>
-              
-              <div className="space-y-3 mb-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                {items.map(item => (
+                           <div className="space-y-3 mb-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {adjustedItems.map(item => (
                   <div key={item.id} className="flex justify-between items-center text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-10 h-10 bg-gray-50 rounded-lg shrink-0 flex items-center justify-center border border-gray-100 relative overflow-hidden">
                         {item.image ? (
-                          <Image src={item.image} alt="item" fill className="object-cover" />
+                          <Image src={item.image} alt="item" fill sizes="40px" className="object-cover" />
                         ) : (
                           <span className="text-[8px] text-gray-400">IMG</span>
                         )}
                       </div>
                       <span className="text-[#3A1E14] font-medium text-xs truncate pr-2 max-w-[150px]">{item.quantity}x {item.name}</span>
                     </div>
-                    <span className="font-bold text-[#5c2a1c] text-xs shrink-0">₹{item.price * item.quantity}</span>
+                    <span className="font-bold text-[#5c2a1c] text-xs shrink-0">₹{(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
-
+ 
               <div className="border-t border-gray-100 pt-4 space-y-2 text-xs">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Subtotal</span>
@@ -276,12 +288,10 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Shipping Fee</span>
-                  <span className={shippingCost === 0 ? "text-green-600 font-bold" : "text-[#3A1E14]"}>
-                    {shippingCost === 0 ? "FREE" : `₹${shippingCost.toFixed(2)}`}
-                  </span>
+                  <span className="text-green-600 font-bold">FREE</span>
                 </div>
               </div>
-
+ 
               <div className="border-t border-gray-200 pt-3 mt-4 flex justify-between items-end">
                 <span className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Final Total</span>
                 <span className="font-bold text-xl text-[#2E7D32]">₹{total.toFixed(2)}</span>

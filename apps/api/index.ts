@@ -3,6 +3,7 @@ import cors from "cors";
 import { prisma } from "database";
 import { Pool, PoolClient } from "pg";
 import type { Category, ProductImage, PricingTier } from "@prisma/client";
+import nodemailer from "nodemailer";
 
 // Trigger restart for database changes - limit 5
 const app = express();
@@ -12,9 +13,9 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false
   },
-  max: 3,
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 20000,
 });
 
 async function runTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -521,6 +522,176 @@ app.delete("/api/products/:id", async (req: Request, res: Response) => {
   }
 });
 
+async function sendOrderEmail(orderId: string) {
+  try {
+    const fullOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: true,
+        address: true,
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    if (!fullOrder) {
+      console.error(`[EMAIL ERROR] Order not found for ID: ${orderId}`);
+      return;
+    }
+
+    const host = process.env.SMTP_HOST || "smtp.gmail.com";
+    const port = Number(process.env.SMTP_PORT || "465");
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const hasConfig = !!(user && pass);
+
+    let itemsHtml = "";
+    let itemsText = "";
+
+    fullOrder.items.forEach((item, index) => {
+      const p = item.product;
+      const weightStr = p.weight ? ` (${p.weight})` : "";
+      itemsHtml += `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5;">${index + 1}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5;"><strong>${p.name}</strong>${weightStr}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5; text-align: center;">${item.quantity}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5; text-align: right;">₹${item.price}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5; text-align: right;">₹${item.price * item.quantity}</td>
+        </tr>
+      `;
+      itemsText += `${index + 1}. ${p.name}${weightStr} - Qty: ${item.quantity} - Price: ₹${item.price} - Total: ₹${item.price * item.quantity}\n`;
+    });
+
+    const clientName = fullOrder.user.name || "N/A";
+    const clientEmail = fullOrder.user.email || "N/A";
+    const clientPhone = fullOrder.user.phone || "N/A";
+    const addressStr = fullOrder.address 
+      ? `${fullOrder.address.address}, ${fullOrder.address.city}, ${fullOrder.address.state} - ${fullOrder.address.pinCode}`
+      : "N/A";
+
+    const emailSubject = `[Hasty Tasty Store] New B2C Order #${fullOrder.id} from ${clientName}`;
+
+    const emailHtml = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #3A1E14; background-color: #FAF8F5; border: 1px solid #EBE3D5; border-radius: 12px; padding: 24px;">
+        <div style="text-align: center; border-bottom: 1px solid #EBE3D5; padding-bottom: 16px; margin-bottom: 20px;">
+          <h1 style="color: #4A171E; font-size: 24px; margin: 0;">New Order Placed</h1>
+          <p style="color: #C89F5F; font-size: 14px; margin: 4px 0 0 0; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Hasty Tasty Golaghat</p>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Customer Information</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 4px 0; color: #666; width: 120px;">Name:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${clientName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Email:</td>
+              <td style="padding: 4px 0; font-weight: bold;"><a href="mailto:${clientEmail}" style="color: #C89F5F;">${clientEmail}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Phone:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${clientPhone}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Shipping Address</h3>
+          <p style="margin: 0; font-size: 14px; line-height: 1.6; font-weight: bold;">
+            ${addressStr}
+          </p>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px; overflow-x: auto;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Ordered Items</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #FAF8F5; text-align: left; font-weight: bold;">
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5;">#</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5;">Product</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5; text-align: center;">Qty</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5; text-align: right;">Price</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Order Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Total Amount:</td>
+              <td style="padding: 4px 0; font-weight: bold; text-align: right; font-size: 16px; color: #2E7D32;">₹${fullOrder.totalAmount.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Payment Method:</td>
+              <td style="padding: 4px 0; font-weight: bold; text-align: right;">Cash on Delivery (COD)</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; color: #888; font-size: 11px; margin-top: 30px; border-top: 1px solid #EBE3D5; padding-top: 16px;">
+          <p style="margin: 0;">This is an automated email from Hasty Tasty Store.</p>
+        </div>
+      </div>
+    `;
+
+    const emailText = `
+=== NEW B2C ORDER ===
+Order ID: ${fullOrder.id}
+Total Amount: ₹${fullOrder.totalAmount}
+Payment: Cash on Delivery (COD)
+
+CUSTOMER INFO:
+Name: ${clientName}
+Email: ${clientEmail}
+Phone: ${clientPhone}
+
+SHIPPING ADDRESS:
+${addressStr}
+
+ITEMS ORDERED:
+${itemsText}
+    `;
+
+    if (hasConfig) {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {
+          user,
+          pass,
+        },
+      });
+
+      console.log(`[EMAIL SENDING] Attempting to send order confirmation #${fullOrder.id} to hastytastyglt@gmail.com...`);
+      await transporter.sendMail({
+        from: `"${clientName} via Hasty Tasty" <${user}>`,
+        to: "hastytastyglt@gmail.com",
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml,
+      });
+      console.log(`[EMAIL SENT] Order confirmation #${fullOrder.id} successfully sent to hastytastyglt@gmail.com!`);
+    } else {
+      console.warn("[EMAIL CONFIG WARNING] SMTP_USER and SMTP_PASS are not configured. Logging order content to console instead:");
+      console.log(emailText);
+    }
+  } catch (err) {
+    console.error(`[EMAIL FATAL ERROR] Failed to send email for order ID ${orderId}:`, err);
+  }
+}
+
 // ── ORDERS ──
 app.post("/api/orders", async (req: Request, res: Response) => {
   try {
@@ -549,12 +720,195 @@ app.post("/api/orders", async (req: Request, res: Response) => {
       include: { items: true },
     }));
 
+    // Trigger order confirmation email in the background
+    sendOrderEmail(order.id).catch(console.error);
+
     return res.status(201).json(order);
   } catch (error) {
     console.error("FATAL ERROR IN /api/orders:", error);
     return res.status(500).json({ error: "Failed to create order", details: String(error) });
   }
 });
+
+async function sendEnquiryEmail(enquiryId: string) {
+  try {
+    const fullEnquiry = await prisma.enquiry.findUnique({
+      where: { id: enquiryId },
+      include: {
+        user: {
+          include: {
+            businessProfile: true
+          }
+        },
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    if (!fullEnquiry) {
+      console.error(`[EMAIL ERROR] Enquiry not found for ID: ${enquiryId}`);
+      return;
+    }
+
+    const host = process.env.SMTP_HOST || "smtp.gmail.com";
+    const port = Number(process.env.SMTP_PORT || "465");
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const hasConfig = !!(user && pass);
+
+    let itemsHtml = "";
+    let itemsText = "";
+
+    fullEnquiry.items.forEach((item, index) => {
+      const p = item.product;
+      const weightStr = p.weight ? ` (${p.weight})` : "";
+      itemsHtml += `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5;">${index + 1}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5;"><strong>${p.name}</strong>${weightStr}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5;">${p.sku || "N/A"}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #EBE3D5; text-align: center;">${item.quantity}</td>
+        </tr>
+      `;
+      itemsText += `${index + 1}. ${p.name}${weightStr} (SKU: ${p.sku || "N/A"}) - Qty: ${item.quantity}\n`;
+    });
+
+    const isB2B = !!fullEnquiry.user.businessProfile;
+    const clientName = fullEnquiry.user.name || "N/A";
+    const clientEmail = fullEnquiry.user.email || "N/A";
+    const clientPhone = fullEnquiry.user.phone || "N/A";
+    const businessName = fullEnquiry.user.businessProfile?.businessName || "N/A";
+    const gstNumber = fullEnquiry.user.businessProfile?.gstNumber || "N/A";
+
+    const expectedDateStr = fullEnquiry.expectedDate
+      ? new Date(fullEnquiry.expectedDate).toLocaleDateString("en-IN", { dateStyle: "long" })
+      : "N/A";
+
+    const notesStr = fullEnquiry.notes || "None";
+    const emailSubject = `[Hasty Tasty B2B] New Enquiry #${fullEnquiry.id} from ${isB2B ? businessName : clientName}`;
+
+    const emailHtml = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #3A1E14; background-color: #FAF8F5; border: 1px solid #EBE3D5; border-radius: 12px; padding: 24px;">
+        <div style="text-align: center; border-bottom: 1px solid #EBE3D5; padding-bottom: 16px; margin-bottom: 20px;">
+          <h1 style="color: #4A171E; font-size: 24px; margin: 0;">New B2B Enquiry</h1>
+          <p style="color: #C89F5F; font-size: 14px; margin: 4px 0 0 0; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Hasty Tasty Golaghat</p>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Customer Information</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 4px 0; color: #666; width: 120px;">Name:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${clientName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Email:</td>
+              <td style="padding: 4px 0; font-weight: bold;"><a href="mailto:${clientEmail}" style="color: #C89F5F;">${clientEmail}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Phone:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${clientPhone}</td>
+            </tr>
+            ${isB2B ? `
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Business:</td>
+              <td style="padding: 4px 0; font-weight: bold; color: #4A171E;">${businessName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">GST Number:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${gstNumber}</td>
+            </tr>
+            ` : ""}
+          </table>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Enquiry Details</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 4px 0; color: #666; width: 120px;">Enquiry ID:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${fullEnquiry.id}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666;">Expected Date:</td>
+              <td style="padding: 4px 0; font-weight: bold;">${expectedDateStr}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #666; vertical-align: top;">Notes:</td>
+              <td style="padding: 4px 0; font-style: italic;">${notesStr}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="background-color: white; border: 1px solid #EBE3D5; border-radius: 8px; padding: 16px; margin-bottom: 20px; overflow-x: auto;">
+          <h3 style="margin-top: 0; color: #4A171E; border-bottom: 1px solid #FAF8F5; padding-bottom: 8px;">Requested Items</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background-color: #FAF8F5; text-align: left; font-weight: bold;">
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5;">#</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5;">Product</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5;">SKU</th>
+                <th style="padding: 10px; border-bottom: 2px solid #EBE3D5; text-align: center;">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="text-align: center; color: #888; font-size: 11px; margin-top: 30px; border-top: 1px solid #EBE3D5; padding-top: 16px;">
+          <p style="margin: 0;">This is an automated email from Hasty Tasty B2B Portal.</p>
+        </div>
+      </div>
+    `;
+
+    const emailText = `
+=== NEW B2B ENQUIRY ===
+Enquiry ID: ${fullEnquiry.id}
+Expected Date: ${expectedDateStr}
+Notes: ${notesStr}
+
+CUSTOMER INFO:
+Name: ${clientName}
+Email: ${clientEmail}
+Phone: ${clientPhone}
+${isB2B ? `Business: ${businessName}\nGST Number: ${gstNumber}\n` : ""}
+ITEMS REQUESTED:
+${itemsText}
+    `;
+
+    if (hasConfig) {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {
+          user,
+          pass,
+        },
+      });
+
+      console.log(`[EMAIL SENDING] Attempting to send enquiry #${fullEnquiry.id} to hastytastyglt@gmail.com...`);
+      await transporter.sendMail({
+        from: `"${isB2B ? businessName : clientName} via Hasty Tasty" <${user}>`,
+        to: "hastytastyglt@gmail.com",
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml,
+      });
+      console.log(`[EMAIL SENT] Enquiry #${fullEnquiry.id} successfully sent to hastytastyglt@gmail.com!`);
+    } else {
+      console.warn("[EMAIL CONFIG WARNING] SMTP_USER and SMTP_PASS are not configured in environment variables. Logging mail content to console instead:");
+      console.log(emailText);
+    }
+  } catch (err) {
+    console.error(`[EMAIL FATAL ERROR] Failed to send email for enquiry ID ${enquiryId}:`, err);
+  }
+}
 
 // ── ENQUIRIES ──
 app.post("/api/enquiries", async (req: Request, res: Response) => {
@@ -586,6 +940,10 @@ app.post("/api/enquiries", async (req: Request, res: Response) => {
     }
 
     const enquiry = await withRetry(() => prisma.enquiry.create({ data: enquiryData }));
+    
+    // Trigger B2B notification email asynchronously
+    sendEnquiryEmail(enquiry.id).catch(console.error);
+
     return res.status(201).json(enquiry);
   } catch (error) {
     console.error("FATAL ERROR IN /api/enquiries:", error);
@@ -610,14 +968,31 @@ app.get("/api/dashboard", async (req: Request, res: Response) => {
     const customers = customersRes.rows;
     
     const productsRes = await pool.query(`
-      SELECT * FROM "Product" ORDER BY stock ASC
+      SELECT p.*,
+             COALESCE((SELECT url FROM "ProductImage" WHERE "productId" = p.id AND "isPrimary" = true LIMIT 1), '') as "imageUrl"
+      FROM "Product" p
+      ORDER BY p.stock ASC
     `);
     const products = productsRes.rows;
+
+    const topProductsRes = await pool.query(`
+      SELECT p.id, p.name, p.slug, p."basePrice" as price, 
+             COALESCE((SELECT url FROM "ProductImage" WHERE "productId" = p.id AND "isPrimary" = true LIMIT 1), '') as image,
+             SUM(oi.quantity)::integer as "salesCount",
+             SUM(oi.quantity * oi.price)::double precision as "totalRevenue"
+      FROM "OrderItem" oi
+      JOIN "Product" p ON oi."productId" = p.id
+      GROUP BY p.id
+      ORDER BY "salesCount" DESC
+      LIMIT 5
+    `);
+    const topProducts = topProductsRes.rows;
 
     res.json({
       orders,
       customers,
-      products
+      products,
+      topProducts
     });
   } catch (error) {
     console.error("FATAL ERROR IN GET /api/dashboard:", error);
@@ -630,8 +1005,37 @@ app.get("/api/orders", async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT o.*, 
-        json_build_object('id', u.id, 'name', u.name, 'email', u.email) as customer,
-        (SELECT json_agg(row_to_json(oi)) FROM "OrderItem" oi WHERE oi."orderId" = o.id) as items
+        json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'phone', u.phone) as customer,
+        (
+          SELECT json_build_object(
+            'id', a.id,
+            'address', a.address,
+            'city', a.city,
+            'state', a.state,
+            'pinCode', a."pinCode",
+            'type', a.type
+          )
+          FROM "Address" a
+          WHERE a.id = o."addressId"
+        ) as address,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', oi.id,
+              'productId', oi."productId",
+              'quantity', oi.quantity,
+              'price', oi.price,
+              'product', json_build_object(
+                'name', p.name,
+                'sku', p.sku,
+                'weight', p.weight
+              )
+            )
+          )
+          FROM "OrderItem" oi
+          JOIN "Product" p ON oi."productId" = p.id
+          WHERE oi."orderId" = o.id
+        ) as items
       FROM "Order" o
       JOIN "User" u ON o."userId" = u.id
       ORDER BY o."createdAt" DESC

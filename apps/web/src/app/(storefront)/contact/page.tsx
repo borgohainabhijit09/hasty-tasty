@@ -64,6 +64,7 @@ export default function ContactPage() {
                   src="/images/hero-cake.png" 
                   alt="Delicious Cupcake and Envelope" 
                   fill 
+                  sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover scale-105"
                 />
               </div>
@@ -159,7 +160,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-[#3A1E14] mb-1">Phone</p>
-                      <p className="text-[15px] font-semibold text-[#3A1E14] mb-1">+91 98765 43210</p>
+                      <a href="tel:+919864402305" className="text-[15px] font-semibold text-[#3A1E14] mb-1 hover:text-[#C89F5F] transition-colors block">+91 98644 02305</a>
                       <p className="text-[12px] text-gray-500">Mon - Sat: 9:00 AM - 7:00 PM</p>
                     </div>
                   </div>
@@ -170,7 +171,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-[#3A1E14] mb-1">Email</p>
-                      <p className="text-[15px] font-semibold text-[#3A1E14] mb-1">hello@hastytasty.com</p>
+                      <a href="mailto:hastytastyglt@gmail.com" className="text-[15px] font-semibold text-[#3A1E14] mb-1 hover:text-[#C89F5F] transition-colors block">hastytastyglt@gmail.com</a>
                       <p className="text-[12px] text-gray-500">We reply within 24 hours</p>
                     </div>
                   </div>
@@ -181,7 +182,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-[#3A1E14] mb-1">WhatsApp</p>
-                      <p className="text-[15px] font-semibold text-[#3A1E14] mb-1">+91 98765 43210</p>
+                      <a href="https://wa.me/919864402305" target="_blank" rel="noopener noreferrer" className="text-[15px] font-semibold text-[#3A1E14] mb-1 hover:text-[#C89F5F] transition-colors block">+91 98644 02305</a>
                       <p className="text-[12px] text-gray-500">Chat with us for quick help</p>
                     </div>
                   </div>
@@ -193,10 +194,9 @@ export default function ContactPage() {
                     <div>
                       <p className="text-[13px] font-bold text-[#3A1E14] mb-1">Address</p>
                       <p className="text-[13px] text-gray-600 leading-relaxed max-w-[200px]">
-                        Hasty Tasty Bakery,<br />
-                        123 Sweet Street,<br />
-                        Kolkata, West Bengal 700001,<br />
-                        India
+                        Hasty Tasty,<br />
+                        Main Road, Golaghat,<br />
+                        Assam - 785621
                       </p>
                     </div>
                   </div>
@@ -293,6 +293,7 @@ export default function ContactPage() {
                   src="/images/hero-cake.png" 
                   alt="Delicious cake" 
                   fill 
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   className="object-cover object-right scale-110"
                 />
               </div>

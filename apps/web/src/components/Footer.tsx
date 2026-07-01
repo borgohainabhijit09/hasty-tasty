@@ -26,7 +26,7 @@ export default function Footer() {
               {[
                 { label: "IG", href: "https://instagram.com" },
                 { label: "FB", href: "https://facebook.com" },
-                { label: "WA", href: "https://wa.me" },
+                { label: "WA", href: "https://wa.me/919864402305" },
               ].map((s) => (
                 <a
                   key={s.label}

@@ -20,6 +20,7 @@ export default function AdminOrdersPage() {
   });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeOrder, setActiveOrder] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string | null}>({isOpen: false, id: null});
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
@@ -331,7 +332,10 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                        <button 
+                          onClick={() => setActiveOrder(order)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
                           <Eye size={16} />
                         </button>
                         <button 
@@ -398,6 +402,152 @@ export default function AdminOrdersPage() {
                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors"
               >
                 Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      {activeOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Order Details</h3>
+                <p className="text-xs text-gray-500 font-mono mt-0.5">#{activeOrder.id.toUpperCase()}</p>
+              </div>
+              <button 
+                onClick={() => setActiveOrder(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-200 text-gray-400 hover:text-gray-900 transition-all font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              
+              {/* Customer & Address Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-[#FAF8F5] p-4 rounded-xl border border-gray-100">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Customer Profile</h4>
+                  <p className="text-sm font-bold text-gray-900">{activeOrder.customer?.name || "N/A"}</p>
+                  <p className="text-xs text-gray-600 mt-1"><strong>Email:</strong> {activeOrder.customer?.email || "N/A"}</p>
+                  <p className="text-xs text-gray-600 mt-0.5"><strong>Phone:</strong> {activeOrder.customer?.phone || "N/A"}</p>
+                </div>
+                
+                <div className="bg-[#FAF8F5] p-4 rounded-xl border border-gray-100">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Delivery Address</h4>
+                  {activeOrder.address ? (
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      <strong>{activeOrder.address.type || "Shipping"} Address:</strong><br />
+                      {activeOrder.address.address}<br />
+                      {activeOrder.address.city}, {activeOrder.address.state} - {activeOrder.address.pinCode}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No shipping address details found</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Order Status Timeline Control */}
+              <div className="bg-[#FAF8F5] p-4 rounded-xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Order Status</h4>
+                  <p className="text-xs text-gray-500">Change fulfillment stage of this order.</p>
+                </div>
+                <div>
+                  <select
+                    value={activeOrder.status}
+                    onChange={(e) => {
+                      handleStatusChange(activeOrder.id, e.target.value);
+                      setActiveOrder((prev: any) => prev ? { ...prev, status: e.target.value } : null);
+                    }}
+                    className={`cursor-pointer outline-none px-4 py-2 rounded-lg text-xs font-bold border ${getStatusColor(activeOrder.status)}`}
+                  >
+                    <option value="PENDING">PENDING</option>
+                    <option value="ACCEPTED">ACCEPTED</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="PREPARING">PREPARING</option>
+                    <option value="PROCESSING">PROCESSING</option>
+                    <option value="READY">READY</option>
+                    <option value="OUT_FOR_DELIVERY">OUT FOR DELIVERY</option>
+                    <option value="DELIVERED">DELIVERED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Order Items</h4>
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100 font-semibold text-gray-700">
+                        <th className="p-3">Product Name</th>
+                        <th className="p-3">SKU</th>
+                        <th className="p-3 text-center">Qty</th>
+                        <th className="p-3 text-right">Unit Price</th>
+                        <th className="p-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {activeOrder.items && activeOrder.items.map((item: any) => {
+                        const p = item.product || {};
+                        const weightStr = p.weight ? ` (${p.weight})` : "";
+                        return (
+                          <tr key={item.id} className="hover:bg-gray-50/50">
+                            <td className="p-3">
+                              <span className="font-bold text-gray-900">{p.name || "Unknown Product"}</span>
+                              {weightStr && <span className="text-[10px] text-gray-400 block">{weightStr}</span>}
+                            </td>
+                            <td className="p-3 text-gray-500 font-mono">{p.sku || "N/A"}</td>
+                            <td className="p-3 text-center font-semibold text-gray-900">{item.quantity}</td>
+                            <td className="p-3 text-right text-gray-600">₹{item.price}</td>
+                            <td className="p-3 text-right font-bold text-gray-900">₹{(item.price * item.quantity).toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Cost Summary */}
+              <div className="flex justify-end">
+                <div className="w-full md:w-64 space-y-2 text-xs border-t border-gray-100 pt-4">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Subtotal</span>
+                    <span className="font-bold text-gray-900">₹{(activeOrder.totalAmount - (activeOrder.shippingAmount || 0) - (activeOrder.taxAmount || 0)).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Location Surcharge</span>
+                    <span className="font-bold text-gray-900">₹{(activeOrder.shippingAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Tax</span>
+                    <span className="font-bold text-gray-900">₹{(activeOrder.taxAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-100 pt-2 text-sm font-bold">
+                    <span className="text-gray-900">Total</span>
+                    <span className="text-emerald-600">₹{activeOrder.totalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+              <button 
+                onClick={() => setActiveOrder(null)}
+                className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold text-xs shadow-sm transition-all"
+              >
+                Close Details
               </button>
             </div>
           </div>

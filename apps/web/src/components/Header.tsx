@@ -304,7 +304,7 @@ export default function Header() {
                               >
                                 <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden shrink-0 relative">
                                   {product.images?.[0]?.url ? (
-                                    <Image src={product.images[0].url} alt={product.name} fill className="object-cover" />
+                                    <Image src={product.images[0].url} alt={product.name} fill sizes="48px" className="object-cover" />
                                   ) : (
                                     <span className="absolute inset-0 flex items-center justify-center text-[8px] text-gray-400">IMG</span>
                                   )}
@@ -423,7 +423,7 @@ export default function Header() {
                               >
                                 <div className="w-10 h-10 bg-gray-100 rounded-md overflow-hidden relative">
                                   {product.images?.[0]?.url ? (
-                                    <Image src={product.images[0].url} alt={product.name} fill className="object-cover" />
+                                    <Image src={product.images[0].url} alt={product.name} fill sizes="40px" className="object-cover" />
                                   ) : (
                                     <span className="absolute inset-0 flex items-center justify-center text-[6px] text-gray-400">IMG</span>
                                   )}

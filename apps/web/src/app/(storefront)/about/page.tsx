@@ -133,7 +133,7 @@ export default function AboutPage() {
                     <div className="w-12 h-12 flex items-center justify-center text-[#C89F5F] mb-3">
                       <Cake size={32} strokeWidth={1.5} />
                     </div>
-                    <p className="text-xl font-bold text-[#3A1E14] mb-1">2018</p>
+                    <p className="text-xl font-bold text-[#3A1E14] mb-1">2000</p>
                     <p className="text-[11px] text-gray-500 font-medium">Our Beginning</p>
                   </div>
                   <div className="flex flex-col items-center text-center">

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, Bell, Calendar as CalendarIcon, 
   ShoppingBag, IndianRupee, Users, Package, Tag,
-  TrendingUp, TrendingDown, ChevronDown
+  TrendingUp, TrendingDown, ChevronDown, Clock, Truck, ChefHat, XCircle
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -49,7 +49,7 @@ const SectionCard = ({ title, actionText, children }: any) => (
 // --- MAIN PAGE ---
 
 export default function AdminDashboard() {
-  const [data, setData] = useState<{ orders: any[], customers: any[], products: any[] } | null>(null);
+  const [data, setData] = useState<{ orders: any[], customers: any[], products: any[], topProducts?: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -80,13 +80,18 @@ export default function AdminDashboard() {
     );
   }
 
-  const { orders, customers, products } = data;
-
+  const { orders, customers, products, topProducts = [] } = data;
+ 
   // Calculate KPIs
   const totalOrders = orders.length;
   const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
   const totalCustomers = customers.length;
   const activeProducts = products.filter(p => p.isActive).length;
+
+  const pendingOrdersCount = orders.filter(o => o.status === 'PENDING').length;
+  const preparingOrdersCount = orders.filter(o => ['ACCEPTED', 'PREPARING', 'PROCESSING', 'READY'].includes(o.status)).length;
+  const trucksOnWayCount = orders.filter(o => o.status === 'OUT_FOR_DELIVERY').length;
+  const cancelledOrdersCount = orders.filter(o => o.status === 'CANCELLED').length;
 
   // Order Status Data
   const orderStatusCounts = orders.reduce((acc, order) => {
@@ -187,6 +192,38 @@ export default function AdminDashboard() {
           subtitle={`Out of ${products.length} products`}
           icon={Package} 
           iconBg="bg-purple-50 text-purple-600" 
+        />
+      </div>
+
+      {/* Fulfillment & Delivery Brief Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <KpiCard 
+          title="Pending Orders" 
+          value={pendingOrdersCount} 
+          subtitle="Awaiting admin confirmation"
+          icon={Clock} 
+          iconBg="bg-yellow-50 text-yellow-600" 
+        />
+        <KpiCard 
+          title="Preparing (In Kitchen)" 
+          value={preparingOrdersCount} 
+          subtitle="Orders currently in production"
+          icon={ChefHat} 
+          iconBg="bg-indigo-50 text-indigo-600" 
+        />
+        <KpiCard 
+          title="Out for Delivery" 
+          value={trucksOnWayCount} 
+          subtitle="Delivery trucks on the way"
+          icon={Truck} 
+          iconBg="bg-sky-50 text-sky-600" 
+        />
+        <KpiCard 
+          title="Cancelled Orders" 
+          value={cancelledOrdersCount} 
+          subtitle="Unfulfilled or rejected orders"
+          icon={XCircle} 
+          iconBg="bg-rose-50 text-rose-600" 
         />
       </div>
 
@@ -313,13 +350,11 @@ export default function AdminDashboard() {
             </div>
           </SectionCard>
         </div>
-      </div>
-
-      {/* Bottom Row: Lists */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Bottom Row: Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* New Customers */}
-        <div className="md:col-span-1 h-[350px]">
+        <div className="lg:col-span-1 h-[350px]">
           <SectionCard title="New Customers" actionText="View All">
             <div className="space-y-4 overflow-y-auto h-[240px] custom-scrollbar pr-2">
               {newCustomers.length === 0 ? (
@@ -343,9 +378,9 @@ export default function AdminDashboard() {
             </div>
           </SectionCard>
         </div>
-
+ 
         {/* Low Stock Alert */}
-        <div className="md:col-span-1 h-[350px]">
+        <div className="lg:col-span-1 h-[350px]">
           <SectionCard title="Low Stock Alert" actionText="View All">
             <div className="space-y-4 overflow-y-auto h-[240px] custom-scrollbar pr-2">
               {lowStock.length === 0 ? (
@@ -354,7 +389,7 @@ export default function AdminDashboard() {
                 lowStock.map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                      <Image src={item.imageUrl || '/images/hero-cake.png'} alt={item.name} fill className="object-cover" />
+                      <img src={item.imageUrl || '/images/hero-cake.png'} alt={item.name} className="object-cover w-full h-full" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
@@ -371,6 +406,33 @@ export default function AdminDashboard() {
             </div>
           </SectionCard>
         </div>
+
+        {/* Top Selling Products */}
+        <div className="lg:col-span-1 h-[350px]">
+          <SectionCard title="Top Selling Products" actionText="View All">
+            <div className="space-y-4 overflow-y-auto h-[240px] custom-scrollbar pr-2">
+              {topProducts.length === 0 ? (
+                 <p className="text-sm text-gray-500 text-center py-4">No sales data available.</p>
+              ) : (
+                topProducts.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                      <img src={item.image || '/images/hero-cake.png'} alt={item.name} className="object-cover w-full h-full" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                      <p className="text-xs text-gray-500">Sales: {item.salesCount} units</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs font-bold text-[#3A1E14]">₹{item.price}</p>
+                      <p className="text-[10px] text-green-600 font-bold">₹{item.totalRevenue.toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        </div>  </div>
 
       </div>
       

@@ -83,14 +83,14 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                 <div className="flex items-start gap-3">
                   <Phone size={14} className="text-[#5c2a1c] mt-0.5" />
                   <div>
-                    <p className="font-bold text-[#3A1E14] text-xs">+91 98765 43210</p>
+                    <p className="font-bold text-[#3A1E14] text-xs">+91 98644 02305</p>
                     <p className="text-[10px] text-gray-500">(9:00 AM - 7:00 PM)</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Mail size={14} className="text-[#5c2a1c]" />
-                  <a href="mailto:hello@hastytasty.com" className="font-bold text-[#3A1E14] text-xs hover:underline">
-                    hello@hastytasty.com
+                  <a href="mailto:hastytastyglt@gmail.com" className="font-bold text-[#3A1E14] text-xs hover:underline">
+                    hastytastyglt@gmail.com
                   </a>
                 </div>
               </div>

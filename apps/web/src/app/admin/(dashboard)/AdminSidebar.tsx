@@ -14,7 +14,8 @@ import {
   BarChart2, 
   Settings, 
   LogOut,
-  Truck
+  Truck,
+  X
 } from 'lucide-react';
 
 const sidebarLinks = [
@@ -39,13 +40,23 @@ function ChevronDown(props: any) {
   );
 }
 
-export default function AdminSidebar({ initials, userName }: { initials: string; userName: string }) {
+export default function AdminSidebar({ initials, userName, onClose }: { initials: string; userName: string; onClose?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-[#21050A] text-white flex flex-col h-full flex-shrink-0 relative z-20">
+    <aside className="w-full lg:w-64 bg-[#21050A] text-white flex flex-col h-full flex-shrink-0 relative z-20">
       {/* Logo Area */}
-      <div className="p-6 flex flex-col items-center justify-center border-b border-white/10 mb-4">
+      <div className="p-6 flex flex-col items-center justify-center border-b border-white/10 mb-4 relative">
+        {onClose && (
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 lg:hidden focus:outline-none transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X size={18} />
+          </button>
+        )}
         <div className="relative w-24 h-12 mb-2">
            <Image src="/images/logo.png" alt="Hasty Tasty Logo" fill sizes="96px" className="object-contain" priority />
         </div>

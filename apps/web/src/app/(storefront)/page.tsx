@@ -181,6 +181,7 @@ export default function Home() {
                         src={cat.imageUrl || "/images/hero-cake.png"}
                         alt={cat.name}
                         fill
+                        sizes="(max-width: 768px) 180px, 220px"
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>
@@ -243,6 +244,7 @@ export default function Home() {
                     src={product.images?.[0]?.url || "/images/hero-cake.png"}
                     alt={product.name}
                     fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </Link>
@@ -375,7 +377,7 @@ export default function Home() {
 
               {/* Left — Cookie image */}
               <div className="relative w-full lg:w-[30%] aspect-[4/3] lg:aspect-auto lg:h-[320px] flex-shrink-0">
-                <Image src="/images/pastries-new.png" alt="Cookies" fill className="object-cover rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none" />
+                <Image src="/images/pastries-new.png" alt="Cookies" fill sizes="(max-width: 1024px) 100vw, 30vw" className="object-cover rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none" />
               </div>
 
               {/* Middle — Heading */}

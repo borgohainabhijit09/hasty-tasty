@@ -489,6 +489,7 @@ export default function AdminProductsPage() {
                               src={product.images?.[0]?.url || '/images/hero-cake.png'} 
                               alt={product.name} 
                               fill 
+                              sizes="48px"
                               className="object-cover" 
                             />
                           </div>
@@ -785,7 +786,7 @@ export default function AdminProductsPage() {
                   />
                   {formData.imageUrl && (
                     <div className="mt-2 relative w-16 h-16 rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
-                      <Image src={formData.imageUrl} alt="Preview" fill className="object-cover" />
+                      <Image src={formData.imageUrl} alt="Preview" fill sizes="64px" className="object-cover" />
                     </div>
                   )}
                 </div>

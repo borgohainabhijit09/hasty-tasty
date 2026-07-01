@@ -219,7 +219,7 @@ export default function SignupPage() {
 
         <div className="mt-8 text-center text-[13px] text-gray-500">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#4A171E] font-bold hover:underline">
+          <Link href={`/login?redirect=${encodeURIComponent(redirectTo)}`} className="text-[#4A171E] font-bold hover:underline">
             Sign In
           </Link>
         </div>
