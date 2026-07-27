@@ -1,0 +1,55 @@
+name: hasty-tasty
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: hasty-tasty-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hastytasty
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: hasty-tasty-api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/hastytasty
+      - DIRECT_URL=postgresql://postgres:password@db:5432/hastytasty
+      - PORT=8080
+    depends_on:
+      - db
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
+    container_name: hasty-tasty-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - DATABASE_URL=postgresql://postgres:password@db:5432/hastytasty
+      - DIRECT_URL=postgresql://postgres:password@db:5432/hastytasty
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=changeme-secure-secret-for-production
+      - AUTH_SECRET=changeme-secure-secret-for-production
+      - AUTH_TRUST_HOST=true
+    depends_on:
+      - api
+      - db
+
+volumes:
+  pgdata:

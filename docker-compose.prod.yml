@@ -1,0 +1,56 @@
+name: hasty-tasty
+
+networks:
+  default:
+    name: food-ordering-cell_default
+    external: true
+
+services:
+  hasty-tasty-db:
+    image: postgres:15-alpine
+    container_name: hasty-tasty-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hastytasty
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - hasty-tasty-pgdata:/var/lib/postgresql/data
+
+  hasty-tasty-api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: hasty-tasty-api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@hasty-tasty-db:5432/hastytasty?schema=public&sslmode=disable
+      - DIRECT_URL=postgresql://postgres:password@hasty-tasty-db:5432/hastytasty?schema=public&sslmode=disable
+      - PORT=8080
+    depends_on:
+      - hasty-tasty-db
+
+  hasty-tasty-web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://api.hastytastyglt.com
+    container_name: hasty-tasty-web
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.hastytastyglt.com
+      - DATABASE_URL=postgresql://postgres:password@hasty-tasty-db:5432/hastytasty?schema=public&sslmode=disable
+      - DIRECT_URL=postgresql://postgres:password@hasty-tasty-db:5432/hastytasty?schema=public&sslmode=disable
+      - NEXTAUTH_URL=https://hastytastyglt.com
+      - NEXTAUTH_SECRET=b4da675005b63795b6a5040a490d1f7e034e3fc4948a287a17688d017b2b0de3
+      - AUTH_SECRET=b4da675005b63795b6a5040a490d1f7e034e3fc4948a287a17688d017b2b0de3
+      - AUTH_TRUST_HOST=true
+    depends_on:
+      - hasty-tasty-api
+      - hasty-tasty-db
+
+volumes:
+  hasty-tasty-pgdata:

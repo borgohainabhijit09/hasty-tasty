@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  name      String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessProfile BusinessProfile?
+  orders          Order[]
+  deliveryOrders  Order[]          @relation("DeliveryBoyOrders")
+  enquiries       Enquiry[]
+  addresses       Address[]
+  reviews         Review[]
+  wishlists       Wishlist[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  MANAGER
+  CUSTOMER
+  PENDING_B2B
+  B2B_CUSTOMER
+  DELIVERY_BOY
+}
+
+model BusinessProfile {
+  id            String         @id @default(cuid())
+  userId        String         @unique
+  businessName  String
+  gstNumber     String
+  contactPerson String
+  tradeLicense  String?
+  status        BusinessStatus @default(PENDING)
+  user          User           @relation(fields: [userId], references: [id])
+}
+
+enum BusinessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  type      String // HOME, WORK, BILLING, SHIPPING
+  address   String
+  city      String
+  state     String
+  pinCode   String
+  latitude  Float?
+  longitude Float?
+  orders    Order[]
+}
+
+model Category {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  description       String?
+  imageUrl          String?
+  isActive          Boolean           @default(true)
+  isB2C             Boolean           @default(true)
+  isB2B             Boolean           @default(false)
+  productCategories ProductCategory[]
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+}
+
+model Product {
+  id                String            @id @default(cuid())
+  productCategories ProductCategory[]
+  name              String
+  slug              String            @unique
+  sku               String?           @unique
+  description       String
+  ingredients       String?
+  shelfLife         String?
+  weight            String?
+  nutritionalInfo   String?
+  basePrice         Float
+  offerPrice        Float?
+  b2bPrice          Float?
+  stock             Int               @default(0)
+  isActive          Boolean           @default(true)
+  images            ProductImage[]
+  pricingTiers      PricingTier[]
+  orderItems        OrderItem[]
+  enquiryItems      EnquiryItem[]
+  reviews           Review[]
+  wishlists         Wishlist[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  isPrimary Boolean @default(false)
+}
+
+model PricingTier {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  minQty    Int
+  maxQty    Int?
+  price     Float
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  status         OrderStatus @default(PENDING)
+  totalAmount    Float
+  taxAmount      Float
+  shippingAmount Float
+  notes          String?
+  addressId      String?
+  address        Address?    @relation(fields: [addressId], references: [id])
+
+  // Delivery assignment
+  deliveryBoyId String?
+  deliveryBoy   User?   @relation("DeliveryBoyOrders", fields: [deliveryBoyId], references: [id])
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  CONFIRMED
+  PREPARING
+  PROCESSING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
+
+model Enquiry {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  notes        String?
+  expectedDate DateTime?
+  status       EnquiryStatus @default(PENDING)
+  items        EnquiryItem[]
+  createdAt    DateTime      @default(now())
+}
+
+enum EnquiryStatus {
+  PENDING
+  REVIEWED
+  ACCEPTED
+  PROCESSING
+  CONVERTED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model EnquiryItem {
+  id        String  @id @default(cuid())
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model ShippingRate {
+  id        String   @id @default(cuid())
+  state     String   @unique
+  rate      Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StoreSettings {
+  id             String   @id @default("default")
+  bannerActive   Boolean  @default(true)
+  bannerTitle    String   @default("Festive Special")
+  bannerSubtitle String   @default("15% OFF")
+  bannerText     String   @default("Celebrate the season with our premium handcrafted cakes and desserts. Limited time offer!")
+  bannerImageUrl String   @default("https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=1089&auto=format&fit=crop")
+  bannerLinkUrl  String   @default("/shop?category=cakes")
+  updatedAt      DateTime @updatedAt
+}
