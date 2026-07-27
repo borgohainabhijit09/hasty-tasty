@@ -152,7 +152,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 5, delayMs = 1000): 
 }
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://hastytastyglt.com', 'https://www.hastytastyglt.com'],
   credentials: true
 }));
 app.use(express.json());
